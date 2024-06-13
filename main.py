@@ -1,182 +1,154 @@
-import re
-import argparse
-import glob
-import os
-import sys
+from tkinter import filedialog
 
-def read_file(filename):
-    with open(filename, 'r', encoding='utf-8') as file:
-        return file.read()
+import customtkinter as ctk
 
-def write_file(filename, content):
-    with open(filename, 'w', encoding='utf-8') as file:
-        file.write(content)
-
-def extract_var_decl(window_block, var_name):
-    pattern = re.compile(fr'<VarDeclaration Name="{var_name}".*?/>', re.DOTALL)
-    match = pattern.search(window_block)
-    return match.group() if match else None
-
-def merge_var_decl(existing_var, new_var):
-    # Извлекаем InitialValue из существующей переменной
-    initial_value_pattern = re.compile(r'InitialValue="(.*?)"')
-    initial_value_match = initial_value_pattern.search(existing_var)
-    initial_value = initial_value_match.group(1) if initial_value_match else None
-
-    if initial_value:
-        # Вставляем InitialValue в новую переменную
-        new_var = re.sub(r'InitialValue=".*?"', f'InitialValue="{initial_value}"', new_var)
-
-    return new_var
-
-def get_tabulation():
-    return ' ' * 24  # Возвращаем 24 пробела для нужной табуляции
-
-# Блок замены на GraphicsComposite
-def process_graphics(iec_hmi_content, graphics_composite_content):
-    # Получаем названия окон из GraphicsCompositeType.txt
-    window_names = graphics_composite_content.strip().split('\n')
-
-    for window_name in window_names:
-        # Ищем блоки WindowFBType и GraphicsCompositeFBType
-        window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
-        graphics_pattern = re.compile(r'<GraphicsCompositeFBType Name="TNewGraphicsCompositeType".*?</GraphicsCompositeFBType>', re.DOTALL)
-
-        window_match = window_pattern.search(iec_hmi_content)
-        graphics_match = graphics_pattern.search(iec_hmi_content)
-
-        if window_match and graphics_match:
-            window_block = window_match.group()
-            graphics_block = graphics_match.group()
-
-            # Замена WindowFBType на GraphicsCompositeFBType
-            updated_window_block = window_block.replace('<WindowFBType', '<GraphicsCompositeFBType').replace('</WindowFBType>', '</GraphicsCompositeFBType>')
-            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration Name="size"
-            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block, count=3)
-            # Извлекаем содержимое <EventOutputs> из GraphicsCompositeFBType
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', graphics_block, re.DOTALL).group(1)
-
-            # Добавляем содержимое <EventOutputs> из GraphicsCompositeFBType в <EventOutputs> из WindowFBType
-            updated_window_block = re.sub(r'(<EventOutputs>)(.*?)(</EventOutputs>)', fr'\1\n{graphics_event_outputs}\2\3', updated_window_block, count=1, flags=re.DOTALL)
-
-            # Извлекаем необходимые VarDeclaration из GraphicsCompositeFBType
-            new_vars_pattern = re.compile(r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle)".*?/>|<VarDeclaration Name="(pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="(pos|visible|size)".*?/>)(?!<VarDeclaration Name="(initialValue)".*?)', re.DOTALL)
-            new_vars = new_vars_pattern.findall(graphics_block)
-            new_vars_text = ''
-            tabulation = get_tabulation()
-            for match in new_vars:
-                var = match[0]
-                # Для переменных pos, visible, и size мы сохраняем существующий InitialValue
-                if 'Name="pos"' in var or 'Name="visible"' in var or 'Name="size"' in var:
-                    existing_var = extract_var_decl(window_block, re.search(r'Name="(.*?)"', var).group(1))
-                    if existing_var:
-                        var = merge_var_decl(existing_var, var)
-                # Добавляем VarDeclaration с нужной табуляцией  
-                new_vars_text += f'{tabulation}{var.strip()}\n'
-            # Вставляем новые VarDeclaration в первый блок <InputVars>
-            updated_window_block = re.sub(r'(<GraphicsCompositeFBType .*?<InputVars>)(.*?)(</InputVars>)', fr'\1\n{new_vars_text}{tabulation}\2\3', updated_window_block, count=1, flags=re.DOTALL)
-
-            # Замена старого блока на обновленный
-            iec_hmi_content = iec_hmi_content.replace(window_block, updated_window_block)
-
-    return iec_hmi_content
-
-# Блок замены на SubWindow
-def process_subwindow(iec_hmi_content, sub_window_content):
-    # Получаем названия окон из TType.txt
-    window_names = sub_window_content.strip().split('\n')
-
-    for window_name in window_names:
-        # Ищем блоки WindowFBType и SubWindowFBType
-        window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
-        graphics_pattern = re.compile(r'<SubWindowFBType Name="TNewSubWindow".*?</SubWindowFBType>', re.DOTALL)
-
-        window_match = window_pattern.search(iec_hmi_content)
-        graphics_match = graphics_pattern.search(iec_hmi_content)
-
-        if window_match and graphics_match:
-            window_block = window_match.group()
-            graphics_block = graphics_match.group()
-
-            # Замена WindowFBType на SubWindowFBType
-            updated_window_block = window_block.replace('<WindowFBType', '<SubWindowFBType').replace('</WindowFBType>', '</SubWindowFBType>')
-            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration Name="size"
-            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block, count=3)
-            # Извлекаем содержимое <EventOutputs> из SubWindowFBType
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', graphics_block, re.DOTALL).group(1)
-
-            # Добавляем содержимое <EventOutputs> из SubWindowFBType в <EventOutputs> из WindowFBType
-            updated_window_block = re.sub(r'(<EventOutputs>)(.*?)(</EventOutputs>)', fr'\1\n{graphics_event_outputs}\2\3', updated_window_block, count=1, flags=re.DOTALL)
-
-            # Извлекаем необходимые VarDeclaration из SubWindowFBType
-            new_vars_pattern = re.compile(r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle|frame_color|caption_font|closable)".*?/>|<VarDeclaration Name="(pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="(pos|visible|size)".*?/>)(?!<VarDeclaration Name="(initialValue)".*?)', re.DOTALL)
-            new_vars = new_vars_pattern.findall(graphics_block)
-            new_vars_text = ''
-            tabulation = get_tabulation()
-            for match in new_vars:
-                var = match[0]
-                # Для переменных pos, visible, и size мы сохраняем существующий InitialValue
-                if 'Name="pos"' in var or 'Name="visible"' in var or 'Name="size"' in var:
-                    existing_var = extract_var_decl(window_block, re.search(r'Name="(.*?)"', var).group(1))
-                    if existing_var:
-                        var = merge_var_decl(existing_var, var)
-                        # Если переменная size, то добавляем 12 к width и 29 к height
-                        if 'Name="size"' in var:
-                            width_match = re.search(r'width:=(\d+)', var)
-                            height_match = re.search(r'height:=(\d+)', var)
-                            if width_match and height_match:
-                                width = int(width_match.group(1)) + 12
-                                height = int(height_match.group(1)) + 29
-                                var = re.sub(r'width:=\d+', f'width:={width}', var)
-                                var = re.sub(r'height:=\d+', f'height:={height}', var)
-                # Устанавливаем InitialValue для moveable и closable как "TRUE"
-                elif 'Name="moveable"' in var or 'Name="closable"' in var:
-                    var = re.sub(r'InitialValue=".*?"', 'InitialValue="TRUE"', var)
-
-                # Добавляем VarDeclaration с нужной табуляцией  
-                new_vars_text += f'{tabulation}{var.strip()}\n'
-            # Вставляем новые VarDeclaration в первый блок <InputVars>
-            updated_window_block = re.sub(r'(<SubWindowFBType .*?<InputVars>)(.*?)(</InputVars>)', fr'\1\n{new_vars_text}{tabulation}\2\3', updated_window_block, count=1, flags=re.DOTALL)
-
-            # Замена старого блока на обновленный
-            iec_hmi_content = iec_hmi_content.replace(window_block, updated_window_block)
-
-    return iec_hmi_content
-
-def main():
-    parser = argparse.ArgumentParser(description="Process .iec_hmi files.")
-    parser.add_argument('iec_hmi_file', help='The .iec_hmi file to process.')
-    parser.add_argument('--graphics', help='The GraphicsCompositeType.txt file.', default='GraphicsCompositeType.txt')
-    parser.add_argument('--subwindow', help='The TSubWindowType.txt file.', default='TSubWindowType.txt')
-
-    args = parser.parse_args()
-
-    if not os.path.exists(args.iec_hmi_file):
-        print(f"File {args.iec_hmi_file} not found.")
-        return
-
-    iec_hmi_content = read_file(args.iec_hmi_file)
-
-    if os.path.exists(args.graphics):
-        graphics_composite_content = read_file(args.graphics)
-        iec_hmi_content = process_graphics(iec_hmi_content, graphics_composite_content)
-    else:
-        print(f"File {args.graphics} not found.")
-
-    if os.path.exists(args.subwindow):
-        sub_window_content = read_file(args.subwindow)
-        iec_hmi_content = process_subwindow(iec_hmi_content, sub_window_content)
-    else:
-        print(f"File {args.subwindow} not found.")
+from core import main_core
 
 
-    # Блок замены DestinationUUID
-    iec_hmi_content = iec_hmi_content.replace('E0FDB58B4C0E41BEF99CB99F0F523C83', 'EAC5288F431A370F7493EF98A2C613D5')
-    iec_hmi_content = iec_hmi_content.replace('B3E2DCE04C63F5A91D55B4B585803AB1', '599604C246641AA6BA0E508C9ABF7EA4')
-    iec_hmi_content = iec_hmi_content.replace('C6CE29B54853ABD72B3982A71CC39353', '1555B4384D69683C33FCB4A79B1A0932')
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-    result_filename = 'result.iec_hmi'
-    write_file(result_filename, iec_hmi_content)
+        self.title("IEC HMI Tool")
+        self.geometry("1200x600")
 
-if __name__ == '__main__':
-    main()
+        self.selected_files = {'iec_hmi': None, 'graphics': None, 'subwindow': None}
+
+        # Окно выбора файла .iec_hmi
+        self.file_frame = ctk.CTkFrame(self)
+        self.file_frame.pack(pady=(20, 5), padx=50, fill="x")
+
+        self.file_label = ctk.CTkLabel(self.file_frame, text="Выберите файл .iec_hmi:", font=("TimesNewRoman", 16))
+        self.file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
+
+        self.file_button = ctk.CTkButton(self.file_frame, text="Выбрать файл",
+                                         command=lambda: self.select_file('iec_hmi'), width=200, height=50)
+        self.file_button.grid(row=0, column=1, sticky="e")
+
+        self.file_frame.grid_columnconfigure(1, weight=1)
+
+        # Окно выбора файла GraphicsCompositeType.txt
+        self.graphics_frame = ctk.CTkFrame(self)
+        self.graphics_frame.pack(pady=(10, 5), padx=50, fill="x")
+
+        self.graphics_label = ctk.CTkLabel(self.graphics_frame, text="Выберите файл GraphicsCompositeType.txt:",
+                                           font=("TimesNewRoman", 16))
+        self.graphics_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
+
+        self.graphics_button = ctk.CTkButton(self.graphics_frame, text="Выбрать файл",
+                                             command=lambda: self.select_file('graphics'), width=200, height=50)
+        self.graphics_button.grid(row=0, column=1, sticky="e")
+
+        self.graphics_frame.grid_columnconfigure(1, weight=1)
+
+        # Окно выбора файла TSubWindowType.txt
+        self.subwindow_frame = ctk.CTkFrame(self)
+        self.subwindow_frame.pack(pady=(10, 5), padx=50, fill="x")
+
+        self.subwindow_label = ctk.CTkLabel(self.subwindow_frame, text="Выберите файл TSubWindowType.txt:",
+                                            font=("TimesNewRoman", 16))
+        self.subwindow_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
+
+        self.subwindow_button = ctk.CTkButton(self.subwindow_frame, text="Выбрать файл",
+                                              command=lambda: self.select_file('subwindow'), width=200, height=50)
+        self.subwindow_button.grid(row=0, column=1, sticky="e")
+
+        self.subwindow_frame.grid_columnconfigure(1, weight=1)
+
+        # Окно с сообщениями
+        self.message_label = ctk.CTkLabel(self, text="Сообщения:", font=("TimesNewRoman", 16), anchor="w")
+        self.message_label.pack(pady=(10, 5), padx=50, anchor="w")
+
+        self.error_text = ctk.CTkTextbox(self, height=5, wrap="word")
+        self.error_text.pack(fill="both", expand=True, padx=50)
+
+        # Кнопки
+        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame.pack(padx=50, pady=10, fill="x")
+
+        self.process_button = ctk.CTkButton(self.button_frame, text="Изменить все окна",
+                                            command=self.run_main, width=300, height=50)
+        self.process_button.pack(side="left", padx=(0, 10), expand=True)
+
+        self.graphics_button = ctk.CTkButton(self.button_frame, text="Изменить только на GraphicsComposite",
+                                             command=self.run_with_graphics, width=300, height=50)
+        self.graphics_button.pack(side="left", padx=(0, 10), expand=True)
+
+        self.subwindow_button = ctk.CTkButton(self.button_frame, text="Изменить только на SubWindow",
+                                              command=self.run_with_subwindow, width=300, height=50)
+        self.subwindow_button.pack(side="left", expand=True)
+
+    def select_file(self, file_type):
+        file_types = [("IEC_HMI files", "*.iec_hmi")] if file_type == 'iec_hmi' else [("Text files", "*.txt")]
+        selected_file = filedialog.askopenfilename(filetypes=file_types)
+        if selected_file:
+            self.selected_files[file_type] = selected_file
+            if file_type == 'iec_hmi':
+                self.file_label.configure(text=f"Выбран файл: {selected_file}")
+            elif file_type == 'graphics':
+                self.graphics_label.configure(text=f"Выбран файл: {selected_file}")
+            elif file_type == 'subwindow':
+                self.subwindow_label.configure(text=f"Выбран файл: {selected_file}")
+        else:
+            if file_type == 'iec_hmi':
+                self.file_label.configure(text="Выберите файл .iec_hmi:")
+            elif file_type == 'graphics':
+                self.graphics_label.configure(text="Выберите файл GraphicsCompositeType.txt:")
+            elif file_type == 'subwindow':
+                self.subwindow_label.configure(text="Выберите файл TSubWindowType.txt:")
+
+    def run_main(self):
+        if self.selected_files['iec_hmi']:
+            if not self.selected_files['graphics']:
+                self.error_text.insert("end", "\n\n   Файл с расширением GraphicsCompositeType.txt не выбран")
+                return
+            if not self.selected_files['subwindow']:
+                self.error_text.insert("end", "\n\n   Файл с расширением TSubWindowType.txt не выбран")
+                return
+
+            command = [
+                self.selected_files['iec_hmi'],
+                '--graphics', self.selected_files['graphics'],
+                '--subwindow', self.selected_files['subwindow']
+            ]
+            main_core(command)  # Вызов функции main_core
+
+            self.error_text.insert("end",
+                                   "\n\n   Изменение всех окон завершено, результат сохранен в файл result.iec_hmi")
+        else:
+            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi не выбран")
+
+    def run_with_graphics(self):
+        if self.selected_files['iec_hmi'] and self.selected_files['graphics']:
+            command = [
+                self.selected_files['iec_hmi'],
+                '--graphics', self.selected_files['graphics'],
+                '--subwindow', self.selected_files['subwindow']
+            ]
+            main_core(command)  # Вызов функции main_core
+            self.error_text.insert("end",
+                                   "\n\n   Изменение окон на GraphicsComposite завершено,"
+                                   " результат сохранен в файл result.iec_hmi")
+        else:
+            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi или GraphicsCompositeType.txt не выбран")
+
+    def run_with_subwindow(self):
+        if self.selected_files['iec_hmi'] and self.selected_files['subwindow']:
+            command = [
+                self.selected_files['iec_hmi'],
+                '--graphics', self.selected_files['graphics'],
+                '--subwindow', self.selected_files['subwindow']
+            ]
+            main_core(command)  # Вызов функции main_core
+            self.error_text.insert("end",
+                                   "\n\n   Изменение окон на SubWindow завершено,"
+                                   " результат сохранен в файл result.iec_hmi")
+        else:
+            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi или TSubWindowType.txt не выбран")
+
+
+if __name__ == "__main__":
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
+    app = App()
+    app.mainloop()
