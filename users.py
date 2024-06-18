@@ -1,6 +1,6 @@
 # users.py
-import tkinter as tk
 from tkinter import messagebox
+
 
 def add_rights(users_file):
     new_rights = "CfgEvViewer,Control,Print,QuitAlarm,SetPoints,Simulate,ViewArj"
@@ -53,10 +53,41 @@ def modify_users_file(users_file):
         messagebox.showerror("Ошибка", f"Файл {users_file} не найден.")
         return None
 
-if __name__ == "__main__":
-    # Example usage if running this script directly
-    users_file = 'Src/Users.usr'  # Adjust the path as per your project structure
-    add_rights(users_file)
-    modified_content = modify_users_file(users_file)
-    if modified_content:
-        print(f"Modified content of Users.usr:\n{modified_content}")
+# соси хуй Никита блять c этой конструкцией ебанной ты нахуя ее везде пихаешь как обезьяна
+# if __name__ == "__main__":
+#     # Example usage if running this script directly
+#     users_file = 'Src/Users.usr'  # Adjust the path as per your project structure
+#     add_rights(users_file)
+#     modified_content = modify_users_file(users_file)
+#     if modified_content:
+#         print(f"Modified content of Users.usr:\n{modified_content}")
+
+
+
+# [Куплет 1]
+# Я тебя растопчу и уничтожу, и будешь ты сморкать свою небритую рожу
+# Ебало тебе разобью, и закроешься ты, а мои текста ложатся ровно на биты
+# И Вечный даст тебе пизды, а я ему помогу
+# И ты будешь сморкаться полгода
+# Дрочиться с этим Ваней, ты крип ебаный
+# Рот бы поприкрыл, а то тебе ёбнем все мы
+#
+# [Припев]
+# Закрой свой рот ебучий, уёбок, сын ты сучий
+# Закрой свой рот, я его наоборот, йоу
+# Закрой свой рот ебучий, уёбок, сын ты сучий
+# Закрой свой рот, я его наоборот
+#
+# [Куплет 2]
+# Сука боротая, побрейся, бомж ебанный
+# Пизды я тебе, нах, дам и район спалю я вместе с хатой
+# Уёбок волосатый, ты хуй, бля, ебаный, закрой рот свой и убейся, блохастый
+# Ебать, что же ты читаешь? Ты позоришь русский рэп
+# Таких уёбков, как ты, на свете нет
+# Пора в рот тебя ебать или вообще на хуй суку такую посылать
+#
+# [Припев]
+# Закрой свой рот ебучий, уёбок, сын ты сучий
+# Закрой свой рот, я его наоборот, йоу
+# Закрой свой рот ебучий, уёбок, сын ты сучий
+# Закрой свой рот, качайтесь, я его наоборот ведь

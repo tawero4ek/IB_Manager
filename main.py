@@ -1,6 +1,10 @@
-from tkinter import filedialog
 import tkinter as tk
+from tkinter import filedialog
+
 import customtkinter as ctk
+import keyboard
+import pyperclip
+
 import finder
 from core import main_core
 
@@ -18,13 +22,16 @@ class App(ctk.CTk):
         self.navbar_frame = ctk.CTkFrame(self)
         self.navbar_frame.pack(fill="x")
 
-        self.iec_manager_button = ctk.CTkButton(self.navbar_frame, text="IEC Manager", command=self.show_iec_manager,font=("TimesNewRoman", 17), width=150, height=40)
+        self.iec_manager_button = ctk.CTkButton(self.navbar_frame, text="IEC Manager", command=self.show_iec_manager,
+                                                font=("TimesNewRoman", 17), width=150, height=40)
         self.iec_manager_button.grid(row=0, column=0, padx=10, pady=20)
 
-        self.search_button = ctk.CTkButton(self.navbar_frame, text="Поиск", command=self.show_search,font=("TimesNewRoman", 17), width=150, height=40)
+        self.search_button = ctk.CTkButton(self.navbar_frame, text="Поиск", command=self.show_search,
+                                           font=("TimesNewRoman", 17), width=150, height=40)
         self.search_button.grid(row=0, column=1, padx=10, pady=20)
 
-        self.users_button = ctk.CTkButton(self.navbar_frame, text="Инфо", command=self.show_users,font=("TimesNewRoman", 17), width=150, height=40)
+        self.users_button = ctk.CTkButton(self.navbar_frame, text="Инфо", command=self.show_users,
+                                          font=("TimesNewRoman", 17), width=150, height=40)
         self.users_button.grid(row=0, column=2, padx=10, pady=20)
 
         self.navbar_frame.grid_columnconfigure(0, weight=1)
@@ -74,7 +81,8 @@ class IECManagerFrame(ctk.CTkFrame):
         self.file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.file_button = ctk.CTkButton(self.file_frame, text="Выбрать файл",
-                                         command=lambda: self.select_file('iec_hmi'),font=("TimesNewRoman", 15), width=200, height=50)
+                                         command=lambda: self.select_file('iec_hmi'), font=("TimesNewRoman", 15),
+                                         width=200, height=50)
         self.file_button.grid(row=0, column=1, sticky="e")
 
         self.file_frame.grid_columnconfigure(1, weight=1)
@@ -88,7 +96,8 @@ class IECManagerFrame(ctk.CTkFrame):
         self.graphics_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.graphics_button = ctk.CTkButton(self.graphics_frame, text="Выбрать файл",
-                                             command=lambda: self.select_file('graphics'),font=("TimesNewRoman", 15), width=200, height=50)
+                                             command=lambda: self.select_file('graphics'), font=("TimesNewRoman", 15),
+                                             width=200, height=50)
         self.graphics_button.grid(row=0, column=1, sticky="e")
 
         self.graphics_frame.grid_columnconfigure(1, weight=1)
@@ -102,7 +111,8 @@ class IECManagerFrame(ctk.CTkFrame):
         self.subwindow_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.subwindow_button = ctk.CTkButton(self.subwindow_frame, text="Выбрать файл",
-                                              command=lambda: self.select_file('subwindow'),font=("TimesNewRoman", 15), width=200, height=50)
+                                              command=lambda: self.select_file('subwindow'), font=("TimesNewRoman", 15),
+                                              width=200, height=50)
         self.subwindow_button.grid(row=0, column=1, sticky="e")
 
         self.subwindow_frame.grid_columnconfigure(1, weight=1)
@@ -111,23 +121,25 @@ class IECManagerFrame(ctk.CTkFrame):
         self.message_label = ctk.CTkLabel(self, text="Сообщения:", font=("TimesNewRoman", 15), anchor="w")
         self.message_label.pack(pady=(10, 5), padx=50, anchor="w")
 
-        self.error_text = ctk.CTkTextbox(self, height=5, wrap="word")
+        self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", state="normal")
         self.error_text.pack(fill="both", expand=True, padx=50)
 
         # Кнопки
         self.button_frame = ctk.CTkFrame(self)
-        self.button_frame.pack(padx=50, pady=(20), fill="x")
+        self.button_frame.pack(padx=50, pady=20, fill="x")
 
         self.process_button = ctk.CTkButton(self.button_frame, text="Изменить все окна",
-                                            command=self.run_main,font=("TimesNewRoman", 15), width=300, height=50)
+                                            command=self.run_main, font=("TimesNewRoman", 15), width=300, height=50)
         self.process_button.pack(anchor="w", side="left", padx=(0, 10), expand=True)
 
         self.graphics_button = ctk.CTkButton(self.button_frame, text="Изменить только на GraphicsComposite",
-                                             command=self.run_with_graphics,font=("TimesNewRoman", 15), width=300, height=50)
+                                             command=self.run_with_graphics, font=("TimesNewRoman", 15), width=300,
+                                             height=50)
         self.graphics_button.pack(anchor="center", side="left", padx=(0, 10), expand=True)
 
         self.subwindow_button = ctk.CTkButton(self.button_frame, text="Изменить только на SubWindow",
-                                              command=self.run_with_subwindow,font=("TimesNewRoman", 15), width=300, height=50)
+                                              command=self.run_with_subwindow, font=("TimesNewRoman", 15), width=300,
+                                              height=50)
         self.subwindow_button.pack(anchor="e", side="left", expand=True)
 
         self.grid_rowconfigure(0, weight=1)
@@ -200,9 +212,30 @@ class IECManagerFrame(ctk.CTkFrame):
             self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi или TSubWindowType.txt не выбран")
 
 
+def copy_selected_text(event):
+    selected_text = event.widget.selection_get()
+    pyperclip.copy(selected_text)
+
+
+def show_notification():
+    notification_window = tk.Toplevel()
+    notification_window.overrideredirect(True)  # Без границ и заголовка
+    notification_label = tk.Label(notification_window, text="Текст скопирован!", font=("Arial", 12), fg="black")
+    notification_label.pack()
+
+    # Указываем координаты для верхнего левого угла экрана
+    x_pos = 0  # координата X
+    y_pos = 0  # координата Y
+    notification_window.geometry("+{}+{}".format(x_pos, y_pos))
+
+    notification_window.after(1500, lambda: notification_window.destroy())
+
+
 class SearchFrame(ctk.CTkFrame):
+
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.select_iec_hmi_label = None
         self.controller = controller
 
         # Основной фрейм для кнопок
@@ -211,12 +244,14 @@ class SearchFrame(ctk.CTkFrame):
 
         # Кнопка поиска строк hid to hide
         self.find_hid_to_hide_button = ctk.CTkButton(button_frame, text="Найти все hid to hide",
-                                                     command=self.find_hid_to_hide, font=("TimesNewRoman", 15), width=300, height=50)
+                                                     command=self.find_hid_to_hide, font=("TimesNewRoman", 15),
+                                                     width=300, height=50)
         self.find_hid_to_hide_button.pack(side=tk.LEFT, padx=(0, 40))
 
         # Кнопка поиска использования выбранных окон
         self.find_window_usage_button = ctk.CTkButton(button_frame, text="Найти использование окон",
-                                                      command=self.find_window_usage, font=("TimesNewRoman", 15), width=300, height=50)
+                                                      command=self.find_window_usage, font=("TimesNewRoman", 15),
+                                                      width=300, height=50)
         self.find_window_usage_button.pack(side=tk.LEFT, padx=(40, 0))
 
         # Окно с сообщениями
@@ -224,8 +259,21 @@ class SearchFrame(ctk.CTkFrame):
         self.message_label.pack(pady=(10, 5), padx=50, anchor="w")
 
         self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", font=("TimesNewRoman", 15))
+
         self.error_text.pack(fill="both", expand=True, pady=(0, 50), padx=50)
-        # Убрана установка Textbox в "disabled", чтобы текст можно было копировать
+
+        def on_right_click(event):
+            copy_selected_text(event)
+            show_notification()
+
+        self.error_text.bind("<Button-3>", on_right_click)
+
+        def on_right_click2():
+            selected_text = self.error_text.selection_get()
+            pyperclip.copy(selected_text)
+            show_notification()
+
+        keyboard.add_hotkey('ctrl+c', on_right_click2)
 
     def select_iec_hmi_file(self):
         file_types = [("IEC_HMI files", "*.iec_hmi")]
@@ -236,19 +284,22 @@ class SearchFrame(ctk.CTkFrame):
             self.select_iec_hmi_label.configure(text=f"Выбран файл: {selected_file}")
 
     def find_hid_to_hide(self):
+        self.error_text.configure(state="normal")
         if not self.controller.selected_files['iec_hmi']:
             # Handle case where no .iec_hmi file is selected
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Выберите файл .iec_hmi сначала.")
+            self.error_text.configure(state="disabled")
             return
-        
+
         iec_hmi_file = self.controller.selected_files['iec_hmi']
         matches = finder.find_hid_to_hide(iec_hmi_file)
-        
+
         if matches:
+
             # Очистка текстового поля перед выводом новых сообщений
             self.error_text.delete(1.0, tk.END)
-            
+
             # Вывод найденных строк в текстовое поле
             self.error_text.insert(tk.END, "Найдены следующие строки:\n")
             for match in matches:
@@ -256,23 +307,27 @@ class SearchFrame(ctk.CTkFrame):
         else:
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Не найдено совпадений.")
+        self.error_text.configure(state="disabled")
 
     def find_window_usage(self):
+        self.error_text.configure(state="normal")
         if not self.controller.selected_files['iec_hmi']:
             # Handle case where no .iec_hmi file is selected
+
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Выберите файл .iec_hmi сначала.")
+            self.error_text.configure(state="disabled")
             return
-        
+
         iec_hmi_file = self.controller.selected_files['iec_hmi']
         graphics_label_file = self.controller.selected_files['graphics']
         subwindow_label_file = self.controller.selected_files['subwindow']
         matches = finder.find_window_usage(iec_hmi_file, graphics_label_file, subwindow_label_file)
-        
+
         if matches:
             # Очистка текстового поля перед выводом новых сообщений
             self.error_text.delete(1.0, tk.END)
-            
+
             # Вывод найденных строк в текстовое поле
             self.error_text.insert(tk.END, "Найдено использование окон:\n")
             for match in matches:
@@ -280,6 +335,9 @@ class SearchFrame(ctk.CTkFrame):
         else:
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Не найдено использование окон.")
+
+        self.error_text.configure(state="disabled")
+
 
 class UsersFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -291,12 +349,20 @@ class UsersFrame(ctk.CTkFrame):
         self.text_widget.pack(pady=(20, 50), padx=50, anchor="w", fill="both", expand=True)
 
         # Добавление текста в виджет
-        self.text_widget.insert("1.0", "\nМодная разработка Яцышина и Чепусова\n")
-        self.text_widget.insert("end", "\nИнструкция с полным описание работы программы находиться в файле IB_Manager.docx\n")
-        self.text_widget.insert("end", "\nВсе вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru\n")
+        self.text_widget.insert("1.0", "\n🤓Модная разработка Яцышина и Чепусова🤓\n")
+        self.text_widget.insert("end",
+                                "\nИнструкция с полным описание работы программы находиться в файле IB_Manager.docx\n")
+        self.text_widget.insert("end", "\nВсе вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru🙈🙉🙊\n\n\n")
+        self.text_widget.insert("end", "\nПО для автоматической аткуализации проектов Sonata V1.0.\n")
+
+ 
+
+
+
 
         # Отключение редактирования текста
         self.text_widget.configure(state="disabled")
+
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("System")

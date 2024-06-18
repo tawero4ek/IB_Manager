@@ -38,7 +38,6 @@ def get_tabulation():
 
 # Блок замены на GraphicsComposite
 def process_graphics(iec_hmi_content, graphics_composite_content):
-    
     # Получаем названия окон из GraphicsCompositeType.txt
     window_names = graphics_composite_content.strip().split('\n')
 
@@ -71,26 +70,25 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
     for window_name in window_names:
         # Ищем блоки WindowFBType
         window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
-									  
-																												 
 
         window_match = window_pattern.search(iec_hmi_content)
-																 
 
         if window_match:
             window_block = window_match.group()
-												   
 
             # Замена WindowFBType на GraphicsCompositeFBType
             updated_window_block = window_block.replace('<WindowFBType', '<GraphicsCompositeFBType').replace(
                 '</WindowFBType>', '</GraphicsCompositeFBType>')
-            
-            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration Name="size"
-            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block,count=3)
+
+            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration
+            # Name="size"
+            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block,
+                                          count=3)
 
             # Извлекаем содержимое <EventOutputs> из жестко заданного блока
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', GRAPHICS_BLOCK, re.DOTALL).group(1)
-				  
+            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', GRAPHICS_BLOCK, re.DOTALL).group(
+                1)
+
             # Добавляем содержимое <EventOutputs> из жестко заданного блока в <EventOutputs> из WindowFBType
             updated_window_block = re.sub(r'(<EventOutputs>)(.*?)(</EventOutputs>)',
                                           fr'\1\n{graphics_event_outputs}\2\3', updated_window_block, count=1,
@@ -99,8 +97,7 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
             # Извлекаем необходимые VarDeclaration из жестко заданного блока
             new_vars_pattern = re.compile(
                 r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle)".*?/>|<VarDeclaration Name="(pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="(pos|visible|size)".*?/>)',
-																												
-															   
+
                 re.DOTALL)
             new_vars = new_vars_pattern.findall(GRAPHICS_BLOCK)
             new_vars_text = ''
@@ -176,13 +173,17 @@ def process_subwindow(iec_hmi_content, sub_window_content):
             window_block = window_match.group()
 
             # Замена WindowFBType на SubWindowFBType
-            updated_window_block = window_block.replace('<WindowFBType', '<SubWindowFBType').replace('</WindowFBType>','</SubWindowFBType>')
+            updated_window_block = window_block.replace('<WindowFBType', '<SubWindowFBType').replace('</WindowFBType>',
+                                                                                                     '</SubWindowFBType>')
 
-            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration Name="size"
-            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block, count=3)
+            # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration
+            # Name="size"
+            updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block,
+                                          count=3)
 
             # Извлекаем содержимое <EventOutputs> из жестко заданного блока
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', SUBWINDOW_BLOCK, re.DOTALL).group(1)
+            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', SUBWINDOW_BLOCK, re.DOTALL).group(
+                1)
 
             # Добавляем содержимое <EventOutputs> из SubWindowFBType в <EventOutputs> из WindowFBType
             updated_window_block = re.sub(r'(<EventOutputs>)(.*?)(</EventOutputs>)',
