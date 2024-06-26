@@ -41,42 +41,65 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
     # Получаем названия окон из GraphicsCompositeType.txt
     window_names = graphics_composite_content.strip().split('\n')
 
+    # Жестко заданный блок GraphicsCompositeFBType
+    GRAPHICS_BLOCK = '''
+    <GraphicsCompositeFBType Name="TNewGraphicsCompositeType" ShowVarTypes="true" UUID="VU23MZKKH3BERD2T7CTTELBTH4">
+        <InterfaceList>
+            <EventOutputs>
+                <Event Name="mouseLBPress" Comment="событие нажатия левой кнопки мыши на объекте" UUID="V6KZEKNMZSTEPFU4AATMKR23JQ" />
+                <Event Name="mouseLBRelease" Comment="событие отпускания левой кнопки мыши на объекте" UUID="CMAONDPWHSAEHMJS6M4XSAGDNQ" />
+                <Event Name="mouseRBPress" Comment="событие нажатия правой кнопки мыши на объекте" UUID="6WJ6SXLHALQEHCL5A7XVWG6Q2M" />
+                <Event Name="mouseRBRelease" Comment="событие отпускания правой кнопки мыши на объекте" UUID="RVY3ACQCBPUUDNBFKT37BQJZDY" />
+                <Event Name="mouseEnter" Comment="событие входа указателя мыши в пределы объекта" UUID="CVJR3KU4H2OUZIFNWASV2K7YKY" />
+                <Event Name="mouseLeave" Comment="событие выхода указателя мыши за пределы объекта" UUID="ULABXQT2CWHEVGWFBP2XXTJVCY" />
+                <Event Name="mouseLBDblClick" Comment="событие двойного щелчка левой кнопки мыши на объекте" UUID="2JR5EGZ5UMXUDM6FM6RQVHYMJA" />
+            </EventOutputs>
+            <InputVars>
+                <VarDeclaration Name="pos" Type="TPos" TypeUUID="CUUMQF3SQNRUHD62PGG7FSXXFY" Comment="позиция объекта" Group="Общие" InitialValue="(x:=0,y:=0)" UUID="YICJMWNGDJSENDCQB25KI7V7TI" />
+                <VarDeclaration Name="angle" Type="LREAL" Comment="угол поворота объекта" Group="Общие" InitialValue="0" UUID="QAO7YAFI4UWUVECT5A6T3LCA2Y" />
+                <VarDeclaration Name="enabled" Type="BOOL" Comment="доступность объекта" Group="Общие" InitialValue="TRUE" UUID="AOL3AFL4X2NUXJHAPDGTSQVGMY" />
+                <VarDeclaration Name="moveable" Type="BOOL" Comment="подвижность объекта" Group="Общие" InitialValue="FALSE" UUID="BWAWE3KLRTPUNPRN4YTUWGLDXI" />
+                <VarDeclaration Name="visible" Type="BOOL" Comment="видимость объекта" Group="Общие" InitialValue="TRUE" UUID="R4UML2QPG4NEHGHPSN2NKE6GUI" />
+                <VarDeclaration Name="zValue" Type="LREAL" Comment="z-индекс объекта" Group="Общие" InitialValue="0" UUID="VXTOSKNU3FNUPMCAN6PKO5EDGI" />
+                <VarDeclaration Name="hint" Type="STRING" Comment="всплывающая подсказка" Group="Общие" InitialValue="&apos;&apos;" UUID="CLZADEBSNHDEJMFXQH53VBNQEE" />
+                <VarDeclaration Name="size" Type="TSize" TypeUUID="XDTT5M52XMSURN23S57SF26UGU" Comment="размер прямоугольника" Group="Общие" InitialValue="(width:=50,height:=50)" UUID="HC2FKFJ4NBUU3J5U7QZTECI2TM" />
+            </InputVars>
+        </InterfaceList>
+    </GraphicsCompositeFBType>
+    '''
     for window_name in window_names:
-        # Ищем блоки WindowFBType и GraphicsCompositeFBType
+        # Ищем блоки WindowFBType
         window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
-        graphics_pattern = re.compile(
-            r'<GraphicsCompositeFBType Name="TNewGraphicsCompositeType".*?</GraphicsCompositeFBType>', re.DOTALL)
 
         window_match = window_pattern.search(iec_hmi_content)
-        graphics_match = graphics_pattern.search(iec_hmi_content)
 
-        if window_match and graphics_match:
+        if window_match:
             window_block = window_match.group()
-            graphics_block = graphics_match.group()
 
             # Замена WindowFBType на GraphicsCompositeFBType
             updated_window_block = window_block.replace('<WindowFBType', '<GraphicsCompositeFBType').replace(
                 '</WindowFBType>', '</GraphicsCompositeFBType>')
+
             # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration
             # Name="size"
             updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block,
                                           count=3)
-            # Извлекаем содержимое <EventOutputs> из GraphicsCompositeFBType
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', graphics_block, re.DOTALL).group(
+
+            # Извлекаем содержимое <EventOutputs> из жестко заданного блока
+            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', GRAPHICS_BLOCK, re.DOTALL).group(
                 1)
 
-            # Добавляем содержимое <EventOutputs> из GraphicsCompositeFBType в <EventOutputs> из WindowFBType
+            # Добавляем содержимое <EventOutputs> из жестко заданного блока в <EventOutputs> из WindowFBType
             updated_window_block = re.sub(r'(<EventOutputs>)(.*?)(</EventOutputs>)',
                                           fr'\1\n{graphics_event_outputs}\2\3', updated_window_block, count=1,
                                           flags=re.DOTALL)
 
-            # Извлекаем необходимые VarDeclaration из GraphicsCompositeFBType
+            # Извлекаем необходимые VarDeclaration из жестко заданного блока
             new_vars_pattern = re.compile(
-                r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle)".*?/>|<VarDeclaration Name="('
-                r'pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="(pos|visible|size)".*?/>)('
-                r'?!<VarDeclaration Name="(initialValue)".*?)',
+                r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle)".*?/>|<VarDeclaration Name="(pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="(pos|visible|size)".*?/>)',
+
                 re.DOTALL)
-            new_vars = new_vars_pattern.findall(graphics_block)
+            new_vars = new_vars_pattern.findall(GRAPHICS_BLOCK)
             new_vars_text = ''
             tabulation = get_tabulation()
             for match in new_vars:
@@ -103,28 +126,63 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
 def process_subwindow(iec_hmi_content, sub_window_content):
     # Получаем названия окон из TType.txt
     window_names = sub_window_content.strip().split('\n')
-
+    # Жестко заданный блок SubWindowFBType
+    SUBWINDOW_BLOCK = '''
+    <SubWindowFBType Name="TNewSubWindow" ShowVarTypes="true" UUID="26ATFZ6JTHMULHTL3SN6NMGTRE">
+        <InterfaceList>
+            <EventInputs>
+                <Event Name="show" UUID="5OQ6VR6NEZGUHNP6SUHDH3MAWM" />
+                <Event Name="hide" UUID="7WLQDBX2VRDUXALIRZGS6HUXSM" />
+            </EventInputs>
+            <EventOutputs>
+                <Event Name="mouseLBPress" Comment="событие нажатия левой кнопки мыши на объекте" UUID="V6KZEKNMZSTEPFU4AATMKR23JQ" />
+                <Event Name="mouseLBRelease" Comment="событие отпускания левой кнопки мыши на объекте" UUID="CMAONDPWHSAEHMJS6M4XSAGDNQ" />
+                <Event Name="mouseRBPress" Comment="событие нажатия правой кнопки мыши на объекте" UUID="6WJ6SXLHALQEHCL5A7XVWG6Q2M" />
+                <Event Name="mouseRBRelease" Comment="событие отпускания правой кнопки мыши на объекте" UUID="RVY3ACQCBPUUDNBFKT37BQJZDY" />
+                <Event Name="mouseEnter" Comment="событие входа указателя мыши в пределы объекта" UUID="CVJR3KU4H2OUZIFNWASV2K7YKY" />
+                <Event Name="mouseLeave" Comment="событие выхода указателя мыши за пределы объекта" UUID="ULABXQT2CWHEVGWFBP2XXTJVCY" />
+                <Event Name="mouseLBDblClick" Comment="событие двойного щелчка левой кнопки мыши на объекте" UUID="2JR5EGZ5UMXUDM6FM6RQVHYMJA" />
+                <Event Name="showed" UUID="SV7KTHQOU7FUVGCPLRYADJZPIE" />
+                <Event Name="hid" UUID="BSQJOLG73PTUPJYLMBHGJQD65M" />
+            </EventOutputs>
+            <InputVars>
+                <VarDeclaration Name="pos" Type="TPos" TypeUUID="CUUMQF3SQNRUHD62PGG7FSXXFY" Comment="позиция объекта" Group="Общие" InitialValue="(x:=0,y:=0)" UUID="YICJMWNGDJSENDCQB25KI7V7TI" />
+                <VarDeclaration Name="angle" Type="LREAL" Comment="угол поворота объекта" Group="Общие" InitialValue="0" UUID="QAO7YAFI4UWUVECT5A6T3LCA2Y" />
+                <VarDeclaration Name="enabled" Type="BOOL" Comment="доступность объекта" Group="Общие" InitialValue="TRUE" UUID="AOL3AFL4X2NUXJHAPDGTSQVGMY" />
+                <VarDeclaration Name="moveable" Type="BOOL" Comment="подвижность объекта" Group="Общие" InitialValue="FALSE" UUID="BWAWE3KLRTPUNPRN4YTUWGLDXI" />
+                <VarDeclaration Name="visible" Type="BOOL" Comment="видимость объекта" Group="Общие" InitialValue="FALSE" UUID="R4UML2QPG4NEHGHPSN2NKE6GUI" />
+                <VarDeclaration Name="zValue" Type="LREAL" Comment="z-индекс объекта" Group="Общие" InitialValue="0" UUID="VXTOSKNU3FNUPMCAN6PKO5EDGI" />
+                <VarDeclaration Name="hint" Type="STRING" Comment="всплывающая подсказка" Group="Общие" InitialValue="&apos;&apos;" UUID="CLZADEBSNHDEJMFXQH53VBNQEE" />
+                <VarDeclaration Name="size" Type="TSize" TypeUUID="XDTT5M52XMSURN23S57SF26UGU" Comment="размер прямоугольника" Group="Общие" InitialValue="(width:=100,height:=100)" UUID="HC2FKFJ4NBUU3J5U7QZTECI2TM" />
+                <VarDeclaration Name="frame_color" Type="TColor" TypeUUID="EDYJMIBCJR5UJOZWGS3UVJENZA" InitialValue="4293980400" UUID="GS2XRATVXFKEDNVR4AYF2FOHB4" />
+                <VarDeclaration Name="bg_color" Type="TColor" TypeUUID="EDYJMIBCJR5UJOZWGS3UVJENZA" InitialValue="4294967295" UUID="IZCT7UFDEEXEXA45WVKQH4CXO4" />
+                <VarDeclaration Name="caption" Type="STRING" InitialValue="&apos;&apos;" UUID="4SEHRDHYXADETHGWSFVJCJBXGI" />
+                <VarDeclaration Name="caption_font" Type="TFont" TypeUUID="YVT73EACFULUPIWKAFYTDAC3S4" InitialValue="(family:=&apos;PT Sans&apos;,size:=12,bold:=FALSE,italic:=FALSE,underline:=FALSE,strikeout:=FALSE)" UUID="QSRIHPHZL46UPJPPH4M4OB7PS4" />
+                <VarDeclaration Name="closable" Type="BOOL" InitialValue="FALSE" UUID="MHEPWGX4TXFUPIWFJHGMKSAXPA" />
+            </InputVars>
+        </InterfaceList>
+    </SubWindowFBType>
+    '''
     for window_name in window_names:
-        # Ищем блоки WindowFBType и SubWindowFBType
+        # Ищем блоки WindowFBType
         window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
-        graphics_pattern = re.compile(r'<SubWindowFBType Name="TNewSubWindow".*?</SubWindowFBType>', re.DOTALL)
 
         window_match = window_pattern.search(iec_hmi_content)
-        graphics_match = graphics_pattern.search(iec_hmi_content)
 
-        if window_match and graphics_match:
+        if window_match:
             window_block = window_match.group()
-            graphics_block = graphics_match.group()
 
             # Замена WindowFBType на SubWindowFBType
             updated_window_block = window_block.replace('<WindowFBType', '<SubWindowFBType').replace('</WindowFBType>',
                                                                                                      '</SubWindowFBType>')
+
             # Удаление старых строк <VarDeclaration Name="pos", <VarDeclaration Name="visible", <VarDeclaration
             # Name="size"
             updated_window_block = re.sub(r'<VarDeclaration Name="(pos|visible|size)".*?/>', '', updated_window_block,
                                           count=3)
-            # Извлекаем содержимое <EventOutputs> из SubWindowFBType
-            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', graphics_block, re.DOTALL).group(
+
+            # Извлекаем содержимое <EventOutputs> из жестко заданного блока
+            graphics_event_outputs = re.search(r'<EventOutputs>(.*?)</EventOutputs>', SUBWINDOW_BLOCK, re.DOTALL).group(
                 1)
 
             # Добавляем содержимое <EventOutputs> из SubWindowFBType в <EventOutputs> из WindowFBType
@@ -132,13 +190,13 @@ def process_subwindow(iec_hmi_content, sub_window_content):
                                           fr'\1\n{graphics_event_outputs}\2\3', updated_window_block, count=1,
                                           flags=re.DOTALL)
 
-            # Извлекаем необходимые VarDeclaration из SubWindowFBType
+            # Извлекаем необходимые VarDeclaration из жестко заданного блока
             new_vars_pattern = re.compile(
                 r'(<VarDeclaration Name="(zValue|hint|moveable|enabled|angle|frame_color|caption_font|closable'
                 r')".*?/>|<VarDeclaration Name="(pos|visible|size)".*?InitialValue=".*?".*?/>|<VarDeclaration Name="('
                 r'pos|visible|size)".*?/>)(?!<VarDeclaration Name="(initialValue)".*?)',
                 re.DOTALL)
-            new_vars = new_vars_pattern.findall(graphics_block)
+            new_vars = new_vars_pattern.findall(SUBWINDOW_BLOCK)
             new_vars_text = ''
             tabulation = get_tabulation()
             for match in new_vars:

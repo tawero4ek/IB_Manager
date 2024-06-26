@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE Type v. 1.0 >
+<Type Name="T_IB_Event" Kind="Struct" UUID="AVPP7DJCEDXEHN637ALVMFBHUA">
+	<Fields>
+		<Field Name="Timestamp" Type="STRING" UUID="J5PRE4P2TBQU5HLNGHZPYK7USQ" />
+		<Field Name="EventNumber" Type="ULINT" UUID="CR4JJBDF44EEBH2NC66LA5F6TA" />
+		<Field Name="Severity" Type="STRING" UUID="HI3IZ2JVNB4EPNL5VNV6AZ24DQ" />
+		<Field Name="EventID" Type="STRING" UUID="VHS37ZAFLDXUHKVWWDQMIFQG5M" />
+		<Field Name="EventName" Type="STRING" UUID="OJJT7OKDYHMUHEEMSUNJOWOZSA" />
+		<Field Name="UserName" Type="STRING" UUID="64JMVJRI3L4UDABPM34RZEF74M" />
+		<Field Name="ClientAddress" Type="STRING" UUID="5LPLYRUB2KZETLCK6PDUEJTZCM" />
+		<Field Name="ClientHostName" Type="STRING" UUID="IZF7IXRS3NBU3G2KYBC7O5SPKQ" />
+		<Field Name="ServerAddress" Type="STRING" UUID="UJMNFVYYNDUUJOPKLH3FTIH3H4" />
+		<Field Name="ServerHostName" Type="STRING" UUID="ZKZLXTSIZB6ETIEEIZWTOJDA7M" />
+		<Field Name="TargetUserName" Type="STRING" UUID="PRXR6DW43VBEHC5MZP2ZSLOPFQ" />
+		<Field Name="TargetAddress" Type="STRING" UUID="BZISS5RTKKGUZCUIDMUH7W6I2E" />
+		<Field Name="TargetHostName" Type="STRING" UUID="EP4YBQF3OX3EPEAXHYL37RFXX4" />
+		<Field Name="Result" Type="STRING" UUID="AEHIV6PJ3QOERAUY32OVYVLHUM" />
+		<Field Name="Detail" Type="STRING" UUID="2PQ5QKW57U7E3DRQSMG6PEVWEE" />
+		<Field Name="StartWrihtSQL" Type="BOOL" UUID="AGMAGCXWIM3E5JNHA5BUNWZ6KQ" />
+	</Fields>
+</Type>
