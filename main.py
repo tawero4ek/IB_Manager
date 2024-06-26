@@ -1,11 +1,13 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+
 import customtkinter as ctk
-import keyboard
 import pyperclip
-from changer import execute_ib_command, change_font_in_file,add_files_to_design,add_variables_to_files
+
 import finder
+from changer import execute_ib_command, change_font_in_file, add_files_to_design
 from core import main_core
+from defender import check_computer_access
 
 
 class App(ctk.CTk):
@@ -36,8 +38,6 @@ class App(ctk.CTk):
         self.users_button = ctk.CTkButton(self.navbar_frame, text="Инфо", command=self.show_users,
                                           font=("TimesNewRoman", 17), width=150, height=40)
         self.users_button.grid(row=0, column=3, padx=10, pady=20)
-
-
 
         self.navbar_frame.grid_columnconfigure(0, weight=1)
         self.navbar_frame.grid_columnconfigure(1, weight=1)
@@ -75,7 +75,6 @@ class App(ctk.CTk):
 
     def show_users(self):
         self.show_frame("UsersFrame")
-
 
 
 class IECManagerFrame(ctk.CTkFrame):
@@ -156,7 +155,8 @@ class IECManagerFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
 
     def select_file(self, file_type):
-        file_types = [("IEC_HMI files", "*.iec_hmi")] if file_type in ['iec_hmi', 'ib_iec_hmi'] else [("Text files", "*.txt")]
+        file_types = [("IEC_HMI files", "*.iec_hmi")] if file_type in ['iec_hmi', 'ib_iec_hmi'] else [
+            ("Text files", "*.txt")]
         selected_file = filedialog.askopenfilename(filetypes=file_types)
         if selected_file:
             self.controller.selected_files[file_type] = selected_file
@@ -177,7 +177,6 @@ class IECManagerFrame(ctk.CTkFrame):
                 self.subwindow_label.configure(text="Выберите файл TSubWindowType.txt:")
             elif file_type == 'ib_iec_hmi':
                 self.controller.frames["IBManagerFrame"].ib_file_label.configure(text="Выберите СТАРЫЙ файл .iec_hmi:")
-
 
     def run_main(self):
         if self.controller.selected_files['iec_hmi']:
@@ -289,7 +288,6 @@ class SearchFrame(ctk.CTkFrame):
 
         self.error_text.bind("<Button-3>", on_right_click)
 
-
     def select_iec_hmi_file(self):
         file_types = [("IEC_HMI files", "*.iec_hmi")]
         selected_file = filedialog.askopenfilename(filetypes=file_types)
@@ -389,11 +387,13 @@ class IBManagerFrame(ctk.CTkFrame):
         self.ib_file_frame = ctk.CTkFrame(self)
         self.ib_file_frame.pack(pady=(20, 5), padx=50, fill="x")
 
-        self.ib_file_label = ctk.CTkLabel(self.ib_file_frame, text="Выберите СТАРЫЙ файл .iec_hmi:", font=("TimesNewRoman", 17))
+        self.ib_file_label = ctk.CTkLabel(self.ib_file_frame, text="Выберите СТАРЫЙ файл .iec_hmi:",
+                                          font=("TimesNewRoman", 17))
         self.ib_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.ib_file_button = ctk.CTkButton(self.ib_file_frame, text="Выбрать файл",
-                                            command=lambda: self.select_file('ib_iec_hmi', self.ib_file_label), font=("TimesNewRoman", 15),
+                                            command=lambda: self.select_file('ib_iec_hmi', self.ib_file_label),
+                                            font=("TimesNewRoman", 15),
                                             width=200, height=50)
         self.ib_file_button.grid(row=0, column=1, sticky="e")
 
@@ -403,7 +403,8 @@ class IBManagerFrame(ctk.CTkFrame):
         self.design_folder_frame = ctk.CTkFrame(self)
         self.design_folder_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.design_folder_label = ctk.CTkLabel(self.design_folder_frame, text="Выберите папку Design:", font=("TimesNewRoman", 17))
+        self.design_folder_label = ctk.CTkLabel(self.design_folder_frame, text="Выберите папку Design:",
+                                                font=("TimesNewRoman", 17))
         self.design_folder_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.design_folder_button = ctk.CTkButton(self.design_folder_frame, text="Выбрать папку",
@@ -421,7 +422,8 @@ class IBManagerFrame(ctk.CTkFrame):
         self.prj_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.prj_file_button = ctk.CTkButton(self.prj_file_frame, text="Выбрать файл",
-                                             command=lambda: self.select_file('prj', self.prj_file_label), font=("TimesNewRoman", 15),
+                                             command=lambda: self.select_file('prj', self.prj_file_label),
+                                             font=("TimesNewRoman", 15),
                                              width=200, height=50)
         self.prj_file_button.grid(row=0, column=1, sticky="e")
 
@@ -431,11 +433,13 @@ class IBManagerFrame(ctk.CTkFrame):
         self.mnemo_file_frame = ctk.CTkFrame(self)
         self.mnemo_file_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.mnemo_file_label = ctk.CTkLabel(self.mnemo_file_frame, text="Выберите файл .int mnemo:", font=("TimesNewRoman", 17))
+        self.mnemo_file_label = ctk.CTkLabel(self.mnemo_file_frame, text="Выберите файл .int mnemo:",
+                                             font=("TimesNewRoman", 17))
         self.mnemo_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.mnemo_file_button = ctk.CTkButton(self.mnemo_file_frame, text="Выбрать файл",
-                                               command=lambda: self.select_file('int_mnemo', self.mnemo_file_label), font=("TimesNewRoman", 15),
+                                               command=lambda: self.select_file('int_mnemo', self.mnemo_file_label),
+                                               font=("TimesNewRoman", 15),
                                                width=200, height=50)
         self.mnemo_file_button.grid(row=0, column=1, sticky="e")
 
@@ -445,11 +449,14 @@ class IBManagerFrame(ctk.CTkFrame):
         self.event_logger_file_frame = ctk.CTkFrame(self)
         self.event_logger_file_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.event_logger_file_label = ctk.CTkLabel(self.event_logger_file_frame, text="Выберите файл .int event logger:", font=("TimesNewRoman", 17))
+        self.event_logger_file_label = ctk.CTkLabel(self.event_logger_file_frame,
+                                                    text="Выберите файл .int event logger:", font=("TimesNewRoman", 17))
         self.event_logger_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
         self.event_logger_file_button = ctk.CTkButton(self.event_logger_file_frame, text="Выбрать файл",
-                                                      command=lambda: self.select_file('int_event_logger', self.event_logger_file_label), font=("TimesNewRoman", 15),
+                                                      command=lambda: self.select_file('int_event_logger',
+                                                                                       self.event_logger_file_label),
+                                                      font=("TimesNewRoman", 15),
                                                       width=200, height=50)
         self.event_logger_file_button.grid(row=0, column=1, sticky="e")
 
@@ -462,7 +469,7 @@ class IBManagerFrame(ctk.CTkFrame):
         self.ib_manager_button = ctk.CTkButton(self.button_frame, text="Перенести палитры",
                                                command=self.run_ib_command, font=("TimesNewRoman", 15), width=300,
                                                height=50)
-        self.ib_manager_button.grid(row=0, column=0, padx=(0,5))
+        self.ib_manager_button.grid(row=0, column=0, padx=(0, 5))
 
         self.change_font_button = ctk.CTkButton(self.button_frame, text="Изменить шрифт",
                                                 command=self.change_font, font=("TimesNewRoman", 15), width=300,
@@ -470,15 +477,14 @@ class IBManagerFrame(ctk.CTkFrame):
         self.change_font_button.grid(row=0, column=1, padx=5)
 
         self.add_variables_button = ctk.CTkButton(self.button_frame, text="Добавить переменные",
-                                          command=self.add_variables, font=("TimesNewRoman", 15), width=300,
-                                          height=50)
+                                                  command=self.add_variables, font=("TimesNewRoman", 15), width=300,
+                                                  height=50)
         self.add_variables_button.grid(row=0, column=2, padx=5)
 
         self.add_files_button = ctk.CTkButton(self.button_frame, text="Добавить файлы",
                                               command=self.add_files, font=("TimesNewRoman", 15), width=300,
                                               height=50)
-        self.add_files_button.grid(row=0, column=3, padx=(5,0))
-
+        self.add_files_button.grid(row=0, column=3, padx=(5, 0))
 
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
@@ -493,8 +499,8 @@ class IBManagerFrame(ctk.CTkFrame):
         self.message_label.pack(pady=(0, 5), padx=50, anchor="w")
 
         self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", state="normal")
-        self.error_text.pack(fill="both", expand=True, padx=50,pady=(0, 10))
-        
+        self.error_text.pack(fill="both", expand=True, padx=50, pady=(0, 10))
+
     def select_file(self, file_type, label):
         file_types = {
             'ib_iec_hmi': [('IEC HMI Files', '*.iec_hmi')],
@@ -507,7 +513,8 @@ class IBManagerFrame(ctk.CTkFrame):
         if file_path:
             self.controller.selected_files[file_type] = file_path
             label.configure(text=f"Выбран файл: {file_path}")
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", f"\n\n   Выбран файл ({file_type}): {file_path}")
+            self.controller.frames["IBManagerFrame"].error_text.insert("end",
+                                                                       f"\n\n   Выбран файл ({file_type}): {file_path}")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
     def select_folder(self):
@@ -516,7 +523,8 @@ class IBManagerFrame(ctk.CTkFrame):
             if folder_path:
                 self.selected_folder = folder_path
                 self.design_folder_label.configure(text=f"Выбрана папка: {folder_path}")
-                self.controller.frames["IBManagerFrame"].error_text.insert("end", f"\n\n   Выбрана папка: {folder_path}")
+                self.controller.frames["IBManagerFrame"].error_text.insert("end",
+                                                                           f"\n\n   Выбрана папка: {folder_path}")
                 self.controller.frames["IBManagerFrame"].error_text.see("end")
         except Exception as e:
             print(f"Error selecting folder: {e}")  # Отладочное сообщение
@@ -525,29 +533,32 @@ class IBManagerFrame(ctk.CTkFrame):
         if self.controller.selected_files['ib_iec_hmi']:
             file_path = self.controller.selected_files['ib_iec_hmi']
             execute_ib_command(file_path)  # Вызов функции из changer.py
-											   
+
             self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Файл успешно обновлен.")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Файл с расширением iec_hmi не выбран")
+            self.controller.frames["IBManagerFrame"].error_text.insert("end",
+                                                                       "\n\n   Файл с расширением iec_hmi не выбран")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
     def change_font(self):
         if self.controller.selected_files['iec_hmi']:
             file_path = self.controller.selected_files['iec_hmi']
             change_font_in_file(file_path)  # Вызов функции из changer.py
-											   
+
             self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Шрифты успешно обновлены.")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Файл с расширением iec_hmi не выбран")
+            self.controller.frames["IBManagerFrame"].error_text.insert("end",
+                                                                       "\n\n   Файл с расширением iec_hmi не выбран")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
     def add_files(self):
         if self.selected_folder:
             add_files_to_design(self.selected_folder)  # Вызов функции из changer.py
-											   
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", f"\n\n   Файлы добавлены в папку: {self.selected_folder}")
+
+            self.controller.frames["IBManagerFrame"].error_text.insert("end",
+                                                                       f"\n\n   Файлы добавлены в папку: {self.selected_folder}")
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
             self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Папка не выбрана.")
@@ -555,14 +566,15 @@ class IBManagerFrame(ctk.CTkFrame):
 
     def add_variables(self):
         try:
-            if self.controller.selected_files['prj'] and self.controller.selected_files['int_mnemo'] and self.controller.selected_files['int_event_logger']:
+            if self.controller.selected_files['prj'] and self.controller.selected_files['int_mnemo'] and \
+                    self.controller.selected_files['int_event_logger']:
                 prj_file = self.controller.selected_files['prj']
                 mnemo_file = self.controller.selected_files['int_mnemo']
                 event_logger_file = self.controller.selected_files['int_event_logger']
-                
+
                 from changer import add_variables_to_files
                 add_variables_to_files(prj_file, mnemo_file, event_logger_file)  # Вызов функции из changer.py
-                
+
                 self.display_message("Переменные добавлены в файлы.", "success")
             else:
                 self.display_message("Один из файлов не выбран.", "error")
@@ -579,8 +591,7 @@ class IBManagerFrame(ctk.CTkFrame):
 
         self.error_text.insert("end", f"\n\n   {prefix} {message}")
         self.error_text.see("end")
-  
-    
+
 
 class UsersFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -595,15 +606,29 @@ class UsersFrame(ctk.CTkFrame):
         self.text_widget.insert("1.0", "\n🤓Модная разработка Яцышина и Чепусова🤓\n")
         self.text_widget.insert("end",
                                 "\nИнструкция с полным описанием работы программы находиться в файле IB_Manager.docx\n")
-        self.text_widget.insert("end", "\nВсе вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru🙈🙉🙊\n\n\n")
+        self.text_widget.insert("end",
+                                "\nВсе вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru🙈🙉🙊\n\n\n")
         self.text_widget.insert("end", "\nПО для автоматической аткуализации проектов Sonata V1.0.\n")
 
         # Отключение редактирования текста
         self.text_widget.configure(state="disabled")
 
 
-if __name__ == "__main__":
+def show_error_dialog():
+    root = tk.Tk()
+    root.withdraw()  # Скрыть основное окно приложения
+    messagebox.showerror("Ошибка", "Доступ запрещен. Обратитесь к администратору.")
+
+
+def execute_on_successful_access():
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
     app = App()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    if check_computer_access():
+        execute_on_successful_access()
+    else:
+        show_error_dialog()
