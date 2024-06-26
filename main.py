@@ -7,7 +7,7 @@ import pyperclip
 import finder
 from changer import execute_ib_command, change_font_in_file, add_files_to_design
 from core import main_core
-from defender import check_computer_access
+from defender import isRun
 
 
 class App(ctk.CTk):
@@ -628,7 +628,7 @@ def execute_on_successful_access():
 
 
 if __name__ == "__main__":
-    if check_computer_access():
+    if isRun():
         execute_on_successful_access()
     else:
         show_error_dialog()
