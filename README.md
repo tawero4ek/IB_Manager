@@ -15,6 +15,9 @@
 
 ```pip freeze > requirements.txt```
 
+### Обфускация
+
+```pyarmor gen name.py```
 
 ---
 
