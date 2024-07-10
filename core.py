@@ -2,7 +2,6 @@ import argparse
 import os
 import re
 
-
 def read_file(filename):
     with open(filename, 'r', encoding='utf-8') as file:
         return file.read()
@@ -38,6 +37,7 @@ def get_tabulation():
 
 # Блок замены на GraphicsComposite
 def process_graphics(iec_hmi_content, graphics_composite_content):
+    
     # Получаем названия окон из GraphicsCompositeType.txt
     window_names = graphics_composite_content.strip().split('\n')
 
@@ -67,6 +67,52 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
         </InterfaceList>
     </GraphicsCompositeFBType>
     '''
+    # Блок замены UUID для  Connection
+    uuid_replacements = {
+        'visible': 'EAC5288F431A370F7493EF98A2C613D5',
+        'pos': '599604C246641AA6BA0E508C9ABF7EA4',
+        'size': '1555B4384D69683C33FCB4A79B1A0932'
+    }
+
+    # Process each line to find and replace relevant UUIDs
+    for line in iec_hmi_content.split('\n'):
+        # Check if the line contains Type="{name}"
+        for name in window_names:
+            if f'Type="{name}"' in line:
+                # Extract source_name using regex
+                source_match = re.search(r'Type="([^"]*)" TypeUUID=', line)
+                if source_match:
+                    source_name = source_match.group(1).split('.')[0]
+    
+                    # Define the pattern to find FBs matching source_name
+                    fb_pattern = re.compile(rf'<FB Name="([^"]*)" Type="{source_name}" TypeUUID=')
+    
+                    # Iterate over all matches of fb_pattern in iec_hmi_content
+                    for fb_match in fb_pattern.findall(iec_hmi_content):
+                        print(f'Found FB Name: {fb_match} with Type: {source_name}')
+    
+                        # Construct the connection_pattern using fb_match and handle multiple attributes
+                        connection_pattern = rf'<Connection Source="[^"]*" Destination="{fb_match}\.(visible|pos|size)" SourceUUID="[^"]*" DestinationUUID="([^"]*)\.([^"]*)"'
+    
+                        # Search for lines in iec_hmi_content that match connection_pattern
+                        for match in re.finditer(connection_pattern, iec_hmi_content):
+                            print("Original line:", match.group(0))  # Print the matched line
+    
+                            # Determine the attribute type (visible, pos, size)
+                            attribute = match.group(1)
+                            new_uuid = uuid_replacements.get(attribute)
+    
+                            # Extract the original UUID parts
+                            original_uuid_part1 = match.group(2)
+                            original_uuid_part2 = match.group(3)
+    
+                            # Replace the second part of the UUID in the matched line using string replacement
+                            updated_line = match.group(0).replace(original_uuid_part2, new_uuid)
+                            print("Updated line:", updated_line)  # Print the updated line
+    
+                            # Replace the original line with the updated line in the content
+                            iec_hmi_content = iec_hmi_content.replace(match.group(0), updated_line)
+    
     for window_name in window_names:
         # Ищем блоки WindowFBType
         window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
@@ -115,10 +161,12 @@ def process_graphics(iec_hmi_content, graphics_composite_content):
             updated_window_block = re.sub(r'(<GraphicsCompositeFBType .*?<InputVars>)(.*?)(</InputVars>)',
                                           fr'\1\n{new_vars_text}{tabulation}\2\3', updated_window_block, count=1,
                                           flags=re.DOTALL)
-
+            # Замена UUID для Connection внутри блока 
+            updated_window_block = updated_window_block.replace('E0FDB58B4C0E41BEF99CB99F0F523C83', 'EAC5288F431A370F7493EF98A2C613D5')
+            updated_window_block = updated_window_block.replace('B3E2DCE04C63F5A91D55B4B585803AB1', '599604C246641AA6BA0E508C9ABF7EA4')
+            updated_window_block = updated_window_block.replace('C6CE29B54853ABD72B3982A71CC39353', '1555B4384D69683C33FCB4A79B1A0932')
             # Замена старого блока на обновленный
             iec_hmi_content = iec_hmi_content.replace(window_block, updated_window_block)
-
     return iec_hmi_content
 
 
@@ -163,6 +211,52 @@ def process_subwindow(iec_hmi_content, sub_window_content):
         </InterfaceList>
     </SubWindowFBType>
     '''
+        # Блок замены UUID для  Connection
+    uuid_replacements = {
+        'visible': 'EAC5288F431A370F7493EF98A2C613D5',
+        'pos': '599604C246641AA6BA0E508C9ABF7EA4',
+        'size': '1555B4384D69683C33FCB4A79B1A0932'
+    }
+
+    # Process each line to find and replace relevant UUIDs
+    for line in iec_hmi_content.split('\n'):
+        # Check if the line contains Type="{name}"
+        for name in window_names:
+            if f'Type="{name}"' in line:
+                # Extract source_name using regex
+                source_match = re.search(r'Type="([^"]*)" TypeUUID=', line)
+                if source_match:
+                    source_name = source_match.group(1).split('.')[0]
+    
+                    # Define the pattern to find FBs matching source_name
+                    fb_pattern = re.compile(rf'<FB Name="([^"]*)" Type="{source_name}" TypeUUID=')
+    
+                    # Iterate over all matches of fb_pattern in iec_hmi_content
+                    for fb_match in fb_pattern.findall(iec_hmi_content):
+                        print(f'Found FB Name: {fb_match} with Type: {source_name}')
+    
+                        # Construct the connection_pattern using fb_match and handle multiple attributes
+                        connection_pattern = rf'<Connection Source="[^"]*" Destination="{fb_match}\.(visible|pos|size)" SourceUUID="[^"]*" DestinationUUID="([^"]*)\.([^"]*)"'
+    
+                        # Search for lines in iec_hmi_content that match connection_pattern
+                        for match in re.finditer(connection_pattern, iec_hmi_content):
+                            print("Original line:", match.group(0))  # Print the matched line
+    
+                            # Determine the attribute type (visible, pos, size)
+                            attribute = match.group(1)
+                            new_uuid = uuid_replacements.get(attribute)
+    
+                            # Extract the original UUID parts
+                            original_uuid_part1 = match.group(2)
+                            original_uuid_part2 = match.group(3)
+    
+                            # Replace the second part of the UUID in the matched line using string replacement
+                            updated_line = match.group(0).replace(original_uuid_part2, new_uuid)
+                            print("Updated line:", updated_line)  # Print the updated line
+    
+                            # Replace the original line with the updated line in the content
+                            iec_hmi_content = iec_hmi_content.replace(match.group(0), updated_line)
+
     for window_name in window_names:
         # Ищем блоки WindowFBType
         window_pattern = re.compile(fr'<WindowFBType Name="{window_name}".*?</WindowFBType>', re.DOTALL)
@@ -225,11 +319,18 @@ def process_subwindow(iec_hmi_content, sub_window_content):
             updated_window_block = re.sub(r'(<SubWindowFBType .*?<InputVars>)(.*?)(</InputVars>)',
                                           fr'\1\n{new_vars_text}{tabulation}\2\3', updated_window_block, count=1,
                                           flags=re.DOTALL)
+            
+            # Замена UUID для Connection внутри блока 
+            updated_window_block = updated_window_block.replace('E0FDB58B4C0E41BEF99CB99F0F523C83', 'EAC5288F431A370F7493EF98A2C613D5')
+            updated_window_block = updated_window_block.replace('B3E2DCE04C63F5A91D55B4B585803AB1', '599604C246641AA6BA0E508C9ABF7EA4')
+            updated_window_block = updated_window_block.replace('C6CE29B54853ABD72B3982A71CC39353', '1555B4384D69683C33FCB4A79B1A0932')
 
             # Замена старого блока на обновленный
             iec_hmi_content = iec_hmi_content.replace(window_block, updated_window_block)
 
     return iec_hmi_content
+
+
 
 
 def main_core(command):
@@ -258,10 +359,6 @@ def main_core(command):
     else:
         print(f"File {args.subwindow} not found.")
 
-    # Блок замены DestinationUUID
-    iec_hmi_content = iec_hmi_content.replace('E0FDB58B4C0E41BEF99CB99F0F523C83', 'EAC5288F431A370F7493EF98A2C613D5')
-    iec_hmi_content = iec_hmi_content.replace('B3E2DCE04C63F5A91D55B4B585803AB1', '599604C246641AA6BA0E508C9ABF7EA4')
-    iec_hmi_content = iec_hmi_content.replace('C6CE29B54853ABD72B3982A71CC39353', '1555B4384D69683C33FCB4A79B1A0932')
-
     result_filename = 'result.iec_hmi'
     write_file(result_filename, iec_hmi_content)
+
