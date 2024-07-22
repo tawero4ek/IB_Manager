@@ -1,3 +1,5 @@
+import os
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -40,7 +42,7 @@ class App(ctk.CTk):
         font = get_font()
 
         self.title("IB Manager")
-        self.geometry("1200x700")
+        self.geometry("1200x850")
 
         self.selected_files = {"iec_hmi": None, "graphics": None, "subwindow": None}
 
@@ -603,6 +605,7 @@ class IBManagerFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+        self.nod_file_checkboxes = {}
         font = get_font()
 
         # Окно выбора файла .iec_hmi
@@ -784,6 +787,36 @@ class IBManagerFrame(ctk.CTkFrame):
         self.button_frame.grid_columnconfigure(3, weight=1)
         self.button_frame.grid_columnconfigure(4, weight=1)
 
+        # Путь к выбранной папке Design
+        self.selected_folder = None
+        # Окно с сообщениями
+        self.message_label = ctk.CTkLabel(
+            self, text="Сообщения:", font=font, anchor="w"
+        )
+        self.message_label.pack(pady=(0, 5), padx=50, anchor="w")
+
+        self.error_text = ctk.CTkTextbox(self, height=100, wrap="word", state="normal")
+        self.error_text.pack(fill="both", expand=False, padx=50, pady=(0, 10))
+
+        self.table_frame = ctk.CTkFrame(self)
+        self.table_frame.pack(side="left", pady=(5, 0), padx=(50, 5), fill="x")
+
+        # Новый фрейм для кнопки "Распространить на узлы"
+        self.spread_to_nodes_frame = ctk.CTkFrame(self)
+        self.spread_to_nodes_frame.pack(
+            side="left", pady=(0, 0), padx=(5, 50), fill="x"
+        )
+
+        self.spread_to_nodes_button = ctk.CTkButton(
+            self.spread_to_nodes_frame,
+            text="Распространить на узлы",
+            command=self.spread_to_nodes,
+            font=font,
+            width=200,
+            height=50,
+        )
+        self.spread_to_nodes_button.pack(pady=0)
+
         #        # Второй ряд кнопок
         #        self.button_frame = ctk.CTkFrame(self)
         #        self.button_frame.pack(pady=(0, 10), padx=50, fill="x")
@@ -812,18 +845,6 @@ class IBManagerFrame(ctk.CTkFrame):
         #       self.button_frame.grid_columnconfigure(1, weight=1)
         #       self.button_frame.grid_columnconfigure(2, weight=1)
         #       self.button_frame.grid_columnconfigure(3, weight=1)
-
-        # Путь к выбранной папке Design
-        self.selected_folder = None
-
-        # Окно с сообщениями
-        self.message_label = ctk.CTkLabel(
-            self, text="Сообщения:", font=font, anchor="w"
-        )
-        self.message_label.pack(pady=(0, 5), padx=50, anchor="w")
-
-        self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", state="normal")
-        self.error_text.pack(fill="both", expand=True, padx=50, pady=(0, 10))
 
     def select_file(self, file_type, label):
         file_types = {
@@ -885,9 +906,25 @@ class IBManagerFrame(ctk.CTkFrame):
             )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
+    def search_nod_files(self, folder_path):
+        nod_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith(".nod"):
+                    file_path = os.path.join(root, file)
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "<Node Name=" in line:
+                                name = line.split('"')[1]
+                                nod_files.append((name, file_path))
+                                break
+        return nod_files
+
     def add_files(self):
         if self.selected_folder:
             add_files_to_design(self.selected_folder)  # Вызов функции из changer.py
+            nod_files = self.search_nod_files(self.selected_folder)
+            self.display_table(nod_files)
 
             self.controller.frames["IBManagerFrame"].error_text.insert(
                 "end", f"\n\n   Файлы добавлены в папку: {self.selected_folder}"
@@ -898,6 +935,62 @@ class IBManagerFrame(ctk.CTkFrame):
                 "end", "\n\n   Папка не выбрана."
             )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
+
+    def display_table(self, nod_files):
+        for widget in self.table_frame.winfo_children():
+            widget.destroy()
+
+        headers = ["Имя узла", "AT_SettingsPgSQL", "AT_IB_Event"]
+        for col, header in enumerate(headers):
+            header_label = ctk.CTkLabel(self.table_frame, text=header)
+            header_label.grid(row=0, column=col, padx=10, pady=5)
+
+        self.nod_file_checkboxes = {}  # Очистим словарь перед использованием
+
+        for row, (name, file_path) in enumerate(nod_files, start=1):
+            name_label = ctk.CTkLabel(self.table_frame, text=name)
+            name_label.grid(row=row, column=0, padx=10, pady=5)
+
+            at_settings_checkbox = ctk.CTkCheckBox(self.table_frame, text="")
+            at_settings_checkbox.grid(row=row, column=1, padx=10, pady=5)
+
+            at_ib_checkbox = ctk.CTkCheckBox(self.table_frame, text="")
+            at_ib_checkbox.grid(row=row, column=2, padx=10, pady=5)
+
+            self.nod_file_checkboxes[file_path] = (at_settings_checkbox, at_ib_checkbox)
+
+    def get_checked_nod_files(self):
+        checked_nod_files = []
+        for file_path, (settings_cb, ib_cb) in self.nod_file_checkboxes.items():
+            if settings_cb.get() or ib_cb.get():
+                checked_nod_files.append((file_path, settings_cb.get(), ib_cb.get()))
+        return checked_nod_files
+
+    def spread_to_nodes(self):
+        try:
+            if self.selected_folder:
+                checked_nod_files = self.get_checked_nod_files()
+                if checked_nod_files:
+                    from changer import spread_to_nodes_function
+
+                    spread_to_nodes_function(
+                        checked_nod_files
+                    )  # Call the function from changer.py
+                    self.display_message(
+                        "Данные успешно распространены на узлы.", "success"
+                    )
+                else:
+                    self.display_message(
+                        "Не выбраны узлы для распространения данных.", "error"
+                    )
+            else:
+                self.display_message(
+                    "Папка не выбрана для добавления данных в узлы.", "error"
+                )
+        except Exception as e:
+            self.display_message(
+                f"Ошибка при распространении данных на узлы: {e}", "error"
+            )
 
     def add_variables(self):
         try:
@@ -940,7 +1033,7 @@ class IBManagerFrame(ctk.CTkFrame):
 
             self.controller.frames["IBManagerFrame"].error_text.insert(
                 "end",
-                "\n\n   Добавлена папка IB, ресурс IS.png, а также импортированны TButtonUser и TIS_Admin.",
+                "\n\n   Добавлена папка IB, ресурс IS.png, а также импортированы  TButtonUser и TIS_Admin.",
             )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
@@ -980,11 +1073,74 @@ class UsersFrame(ctk.CTkFrame):
         self.text_widget.configure(state="disabled")
 
 
+class ScrollableOptionMenu(ctk.CTkFrame):
+    def __init__(self, parent, values, command=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.values = sorted(values)  # Сортируем значения в алфавитном порядке
+        self.command = command
+
+        self.var = tk.StringVar(value="Select Name")
+
+        # Create a button to act as the dropdown trigger
+        self.dropdown_button = ctk.CTkButton(
+            self, textvariable=self.var, command=self._toggle_menu
+        )
+        self.dropdown_button.pack(fill=tk.X)
+
+        self.menu_frame = ctk.CTkFrame(self)
+        self.listbox = tk.Listbox(self.menu_frame, selectmode=tk.SINGLE)
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.scrollbar = tk.Scrollbar(self.menu_frame, orient=tk.VERTICAL)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.listbox.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.config(command=self.listbox.yview)
+
+        for value in self.values:  # Используем отсортированный список
+            self.listbox.insert(tk.END, value)
+
+        # Bind events specifically to the listbox
+        self.listbox.bind("<<ListboxSelect>>", self._on_select)
+        self.listbox.bind("<MouseWheel>", self._on_mousewheel)  # Bind to Listbox only
+
+        self.menu_open = False
+
+    def _toggle_menu(self):
+        if self.menu_open:
+            self.menu_frame.pack_forget()
+        else:
+            self.menu_frame.pack(fill=tk.BOTH, expand=True)
+            self.listbox.focus_set()  # Set focus to Listbox to handle MouseWheel events properly
+        self.menu_open = not self.menu_open
+
+    def _on_select(self, event):
+        selection_indices = self.listbox.curselection()
+        if selection_indices:
+            selection = self.listbox.get(selection_indices[0])
+            self.var.set(selection)
+            self.menu_frame.pack_forget()
+            self.menu_open = False
+            if self.command:
+                self.command(selection)
+
+    def _on_mousewheel(self, event):
+        # Ensure that the listbox is still valid and exists
+        if self.listbox and self.listbox.winfo_exists():
+            try:
+                # Determine scroll amount based on the wheel delta
+                scroll_amount = int(-1 * (event.delta / 120))
+                self.listbox.yview_scroll(scroll_amount, "units")
+                # Ensure the Listbox remains focused
+                self.listbox.focus_set()
+                # Prevent default handling of the event
+                return "break"
+            except Exception as e:
+                print(f"Error in mousewheel scrolling: {e}")
+
 class EmbedFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        font = get_font()
 
         # Окно выбора файла .iec_hmi
         self.ib_file_frame = ctk.CTkFrame(self)
@@ -994,26 +1150,67 @@ class EmbedFrame(ctk.CTkFrame):
             self.ib_file_frame,
             text="Введите название окна Event:",
             wraplength=880,
-            font=font,
         )
         self.ib_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.ib_file_entry = ctk.CTkEntry(self.ib_file_frame, font=font, width=300)
+        self.ib_file_entry = ctk.CTkEntry(self.ib_file_frame, width=300)
         self.ib_file_entry.grid(row=0, column=1, padx=(10, 10), sticky="w")
 
         self.ib_add_rights_button = ctk.CTkButton(
             self.ib_file_frame,
             text="Добавить права",
             command=lambda: self.add_event(self.ib_file_entry.get()),
-            font=font,
             width=200,
             height=50,
         )
         self.ib_add_rights_button.grid(
-            row=0, column=2, pady=(0, 0), padx=(10, 10), sticky="e"
+            row=0, column=2, pady=(0, 0), padx=(10, 0), sticky="e"
         )
 
         self.ib_file_frame.grid_columnconfigure(1, weight=1)
+
+        self.table_frame = ctk.CTkFrame(self)
+        self.table_frame.pack(pady=(20, 5), padx=50, fill="both", expand=True)
+
+        # Create a canvas to hold the table
+        self.canvas = tk.Canvas(self.table_frame)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Add a vertical scrollbar to the canvas
+        self.scrollbar = ctk.CTkScrollbar(
+            self.table_frame, orientation=tk.VERTICAL, command=self.canvas.yview
+        )
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Configure the canvas to work with the scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
+
+        # Handle mouse wheel scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        # Create another frame inside the canvas to hold the actual table
+        self.table_inner_frame = ctk.CTkFrame(self.canvas)
+        self.canvas.create_window((0, 0), window=self.table_inner_frame, anchor="nw")
+
+        # Initialize table
+        self.create_table()
+
+        # Update button
+        self.update_button = ctk.CTkButton(
+            self,
+            text="Обновить таблицу",
+            command=self.update_table,
+            width=200,
+            height=50,
+        )
+        self.update_button.pack(pady=10)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def add_event(self, event_name):
         if self.controller.selected_files["iec_hmi"]:
@@ -1032,6 +1229,145 @@ class EmbedFrame(ctk.CTkFrame):
             )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
+    def parse_iec_hmi_file(self):
+        names = []
+        try:
+            if self.controller.selected_files["iec_hmi"]:
+                file_path = self.controller.selected_files["iec_hmi"]
+                with open(file_path, "r", encoding="utf-8") as file:
+                    content = file.read()
+
+                    # Найти строки с шаблоном Name="*****" ShowVarTypes=
+                    pattern = r'Name="([^"]+)"\s+ShowVarTypes='
+                    fb_entries = re.findall(pattern, content)
+                    #print(f"Found window names: {fb_entries}")  # Debugging print statement
+
+                    names.extend(fb_entries)
+
+            else:
+                print("No iec_hmi file selected")  # Debugging print statement
+
+        except Exception as e:
+            print(f"Error parsing the file: {e}")
+
+        return names
+
+    def parse_types_in_window(self, window_name):
+        types = set()  # Use set to store unique values
+        try:
+            if self.controller.selected_files["iec_hmi"]:
+                file_path = self.controller.selected_files["iec_hmi"]
+                with open(file_path, "r", encoding="utf-8") as file:
+                    content = file.read()
+    
+                    # Find the window with the specified name
+                    window_pattern = rf'Name="{window_name}"\s+ShowVarTypes='
+                    window_match = re.search(window_pattern, content)
+                    if window_match:
+                        start_pos = window_match.end()
+                        # Find the end of the window's content, look for the next 'Name="' or end of content
+                        next_window_match = re.search(r'Name="[^"]+"\s+ShowVarTypes=', content[start_pos:])
+                        end_pos = start_pos + next_window_match.start() if next_window_match else len(content)
+                        window_content = content[start_pos:end_pos]
+    
+                        # Find lines with pattern Type="*****" TypeUUID=
+                        pattern_types = r'<FB[^>]*Type="([^"]*)"[^>]*>(?:(?!<FB)[\s\S])*?<VarValue Variable="(pos|size|zValue)".*?</FB>'
+                    
+                    
+                        type_entries = re.findall(pattern_types, window_content, re.DOTALL)
+    
+                        # Extract only the unique Type entries
+                        for type_entry in type_entries:
+                            types.add(type_entry[0])
+    
+                    else:
+                        print(f"No window named {window_name} found")  # Debugging print statement
+    
+            else:
+                print("No iec_hmi file selected")  # Debugging print statement
+    
+        except Exception as e:
+            print(f"Error parsing the file: {e}")
+    
+        return list(types)  # Convert set back to list
+
+
+
+    def create_table(self):
+        names = self.parse_iec_hmi_file()
+        #print(f"Creating table with initial names: {names}")  # Debugging print statement
+
+        # Clear the existing content in the table_inner_frame
+        for widget in self.table_inner_frame.winfo_children():
+            widget.destroy()
+
+        # Table headers
+        self.name_optionmenu = ScrollableOptionMenu(
+            self.table_inner_frame, values=names, command=self.optionmenu_callback
+        )
+        self.name_optionmenu.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+
+        header_control = ctk.CTkLabel(self.table_inner_frame, text="R_Control")
+        header_control.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+
+        # Empty row initially
+        self.empty_row_label = ctk.CTkLabel(self.table_inner_frame, text="")
+        self.empty_row_label.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+
+        self.empty_row_checkbox = ctk.CTkCheckBox(self.table_inner_frame, text="")
+        self.empty_row_checkbox.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+
+        # Configure column weights
+        self.table_inner_frame.grid_columnconfigure(0, weight=1)
+        self.table_inner_frame.grid_columnconfigure(1, weight=1)
+
+        # Update the scrollregion after adding new widgets
+        self.table_inner_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def update_table(self):
+        self.create_table()
+
+    def optionmenu_callback(self, choice):
+        print(f"Option menu dropdown clicked: {choice}")  # Debugging print statement
+        types = self.parse_types_in_window(choice)
+        self.update_table_with_types(types)
+
+    def update_table_with_types(self, types):
+        print(f"Updating table with types: {types}")  # Debugging print statement
+    
+        # Clear the existing content in the table_inner_frame
+        for widget in self.table_inner_frame.winfo_children():
+            widget.destroy()
+    
+        # Table headers
+        header_name = ctk.CTkLabel(self.table_inner_frame, text="Name")
+        header_name.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+    
+        header_control = ctk.CTkLabel(self.table_inner_frame, text="R_Control")
+        header_control.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+    
+        if not types:
+            # No types found, add a message
+            no_types_label = ctk.CTkLabel(self.table_inner_frame, text="No types found in selected window.")
+            no_types_label.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+        else:
+            # Table rows with types
+            for i, type_name in enumerate(types):
+                display_text = f"{type_name}"
+                name_label = ctk.CTkLabel(self.table_inner_frame, text=display_text)
+                name_label.grid(row=i + 1, column=0, padx=5, pady=5, sticky="nsew")
+    
+                control_checkbox = ctk.CTkCheckBox(self.table_inner_frame, text="")
+                control_checkbox.grid(row=i + 1, column=1, padx=5, pady=5, sticky="nsew")
+    
+        # Configure column weights
+        self.table_inner_frame.grid_columnconfigure(0, weight=1)
+        self.table_inner_frame.grid_columnconfigure(1, weight=1)
+    
+        # Update the scrollregion after adding new widgets
+        self.table_inner_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
 def show_error_dialog():
     root = tk.Tk()
