@@ -1,13 +1,21 @@
+import os
+import re
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox,PhotoImage
 
 import customtkinter as ctk
 import pyperclip
 
 import finder
-from changer import execute_ib_command, change_font_in_file, add_files_to_design
+from changer import (
+    add_event_to_files,
+    add_files_to_design,
+    add_HMI_to_files,
+    change_font_in_file,
+    execute_ib_command,
+)
 from core import main_core
-from defender import isRun, get_allowed_computer_name
+from defender import get_allowed_computer_name, isRun
 
 # Настройка конфигурации для шрифтов
 computer_fonts = {
@@ -19,54 +27,97 @@ computer_fonts = {
     "SPB-ERSHOV": ("Trebuchet MS", 15),
     "SPB-NIKITIN": ("Courier New", 15),
     "SPB-VASILIEV": ("Tahoma", 15),
-    "SPB-SERGEY": ("Times New Roman", 15)
+    "SPB-SERGEY": ("Times New Roman", 15),
 }
+
 
 def get_font():
     current_computer_name = get_allowed_computer_name()
     return computer_fonts.get(current_computer_name)
 
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         font = get_font()
+        
+        self.title("IB Velocity")
+        self.geometry("1200x850")
 
-        self.title("IB Manager")
-        self.geometry("1200x700")
-
-        self.selected_files = {'iec_hmi': None, 'graphics': None, 'subwindow': None}
+        self.selected_files = {"iec_hmi": None, "graphics": None, "subwindow": None}
 
         # Top navigation bar
         self.navbar_frame = ctk.CTkFrame(self)
         self.navbar_frame.pack(fill="x")
 
-        self.iec_manager_button = ctk.CTkButton(self.navbar_frame, text="IEC Manager", command=self.show_iec_manager,
-                                                font=font, width=150, height=40)
+        self.iec_manager_button = ctk.CTkButton(
+            self.navbar_frame,
+            text="Перевод",
+            command=self.show_iec_manager,
+            font=font,
+            width=150,
+            height=40,
+        )
         self.iec_manager_button.grid(row=0, column=0, padx=10, pady=20)
 
-        self.search_button = ctk.CTkButton(self.navbar_frame, text="Поиск", command=self.show_search,
-                                           font=font, width=150, height=40)
+        self.search_button = ctk.CTkButton(
+            self.navbar_frame,
+            text="Поиск",
+            command=self.show_search,
+            font=font,
+            width=150,
+            height=40,
+        )
         self.search_button.grid(row=0, column=1, padx=10, pady=20)
 
-        self.ib_manager_button = ctk.CTkButton(self.navbar_frame, text="IB Tool", command=self.show_ib_manager,
-                                               font=font, width=150, height=40)
+        self.ib_manager_button = ctk.CTkButton(
+            self.navbar_frame,
+            text="Менеджер ИБ",
+            command=self.show_ib_manager,
+            font=font,
+            width=150,
+            height=40,
+        )
         self.ib_manager_button.grid(row=0, column=2, padx=10, pady=20)
 
-        self.users_button = ctk.CTkButton(self.navbar_frame, text="Инфо", command=self.show_users,
-                                          font=font, width=150, height=40)
-        self.users_button.grid(row=0, column=3, padx=10, pady=20)
+        self.embed_button = ctk.CTkButton(
+            self.navbar_frame,
+            text="Права",
+            command=self.show_embed,
+            font=font,
+            width=150,
+            height=40,
+        )
+        self.embed_button.grid(row=0, column=3, padx=10, pady=20)
+
+        self.users_button = ctk.CTkButton(
+            self.navbar_frame,
+            text="Инфо",
+            command=self.show_users,
+            font=font,
+            width=150,
+            height=40,
+        )
+        self.users_button.grid(row=0, column=4, padx=10, pady=20)
 
         self.navbar_frame.grid_columnconfigure(0, weight=1)
         self.navbar_frame.grid_columnconfigure(1, weight=1)
         self.navbar_frame.grid_columnconfigure(2, weight=1)
         self.navbar_frame.grid_columnconfigure(3, weight=1)
+        self.navbar_frame.grid_columnconfigure(4, weight=1)
 
         # Main container for different frames
         self.main_container = ctk.CTkFrame(self)
         self.main_container.pack(fill="both", expand=True)
 
         self.frames = {}
-        for F in (IECManagerFrame, SearchFrame, IBManagerFrame, UsersFrame):
+        for F in (
+            IECManagerFrame,
+            SearchFrame,
+            IBManagerFrame,
+            UsersFrame,
+            EmbedFrame,
+        ):  # , EmbedFrame
             page_name = F.__name__
             frame = F(parent=self.main_container, controller=self)
             self.frames[page_name] = frame
@@ -93,6 +144,9 @@ class App(ctk.CTk):
     def show_users(self):
         self.show_frame("UsersFrame")
 
+    def show_embed(self):
+        self.show_frame("EmbedFrame")
+
 
 class IECManagerFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -104,12 +158,19 @@ class IECManagerFrame(ctk.CTkFrame):
         self.file_frame = ctk.CTkFrame(self)
         self.file_frame.pack(pady=(20, 5), padx=50, fill="x")
 
-        self.file_label = ctk.CTkLabel(self.file_frame, text="Выберите файл .iec_hmi:", font=font)
+        self.file_label = ctk.CTkLabel(
+            self.file_frame, text="Выберите файл .iec_hmi:", wraplength=880, font=font
+        )
         self.file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.file_button = ctk.CTkButton(self.file_frame, text="Выбрать файл",
-                                         command=lambda: self.select_file('iec_hmi'), font=font,
-                                         width=200, height=50)
+        self.file_button = ctk.CTkButton(
+            self.file_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("iec_hmi"),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.file_button.grid(row=0, column=1, sticky="e")
 
         self.file_frame.grid_columnconfigure(1, weight=1)
@@ -118,13 +179,22 @@ class IECManagerFrame(ctk.CTkFrame):
         self.graphics_frame = ctk.CTkFrame(self)
         self.graphics_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.graphics_label = ctk.CTkLabel(self.graphics_frame, text="Выберите файл GraphicsCompositeType.txt:",
-                                           font=font)
+        self.graphics_label = ctk.CTkLabel(
+            self.graphics_frame,
+            wraplength=880,
+            text="Выберите файл GraphicsCompositeType.txt:",
+            font=font,
+        )
         self.graphics_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.graphics_button = ctk.CTkButton(self.graphics_frame, text="Выбрать файл",
-                                             command=lambda: self.select_file('graphics'), font=font,
-                                             width=200, height=50)
+        self.graphics_button = ctk.CTkButton(
+            self.graphics_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("graphics"),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.graphics_button.grid(row=0, column=1, sticky="e")
 
         self.graphics_frame.grid_columnconfigure(1, weight=1)
@@ -133,19 +203,30 @@ class IECManagerFrame(ctk.CTkFrame):
         self.subwindow_frame = ctk.CTkFrame(self)
         self.subwindow_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.subwindow_label = ctk.CTkLabel(self.subwindow_frame, text="Выберите файл TSubWindowType.txt:",
-                                            font=font)
+        self.subwindow_label = ctk.CTkLabel(
+            self.subwindow_frame,
+            wraplength=880,
+            text="Выберите файл TSubWindowType.txt:",
+            font=font,
+        )
         self.subwindow_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.subwindow_button = ctk.CTkButton(self.subwindow_frame, text="Выбрать файл",
-                                              command=lambda: self.select_file('subwindow'), font=font,
-                                              width=200, height=50)
+        self.subwindow_button = ctk.CTkButton(
+            self.subwindow_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("subwindow"),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.subwindow_button.grid(row=0, column=1, sticky="e")
 
         self.subwindow_frame.grid_columnconfigure(1, weight=1)
 
         # Окно с сообщениями
-        self.message_label = ctk.CTkLabel(self, text="Сообщения:", font=font, anchor="w")
+        self.message_label = ctk.CTkLabel(
+            self, text="Сообщения:", font=font, anchor="w"
+        )
         self.message_label.pack(pady=(10, 5), padx=50, anchor="w")
 
         self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", state="normal")
@@ -155,93 +236,149 @@ class IECManagerFrame(ctk.CTkFrame):
         self.button_frame = ctk.CTkFrame(self)
         self.button_frame.pack(padx=50, pady=20, fill="x")
 
-        self.process_button = ctk.CTkButton(self.button_frame, text="Изменить все окна",
-                                            command=self.run_main, font=font, width=300, height=50)
+        self.process_button = ctk.CTkButton(
+            self.button_frame,
+            text="Изменить все окна",
+            command=self.run_main,
+            font=font,
+            width=300,
+            height=50,
+        )
         self.process_button.pack(anchor="w", side="left", padx=(0, 10), expand=True)
 
-        self.graphics_button = ctk.CTkButton(self.button_frame, text="Изменить только на GraphicsComposite",
-                                             command=self.run_with_graphics, font=font, width=300,
-                                             height=50)
-        self.graphics_button.pack(anchor="center", side="left", padx=(0, 10), expand=True)
+        self.graphics_button = ctk.CTkButton(
+            self.button_frame,
+            text="Изменить только на GraphicsComposite",
+            command=self.run_with_graphics,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.graphics_button.pack(
+            anchor="center", side="left", padx=(0, 10), expand=True
+        )
 
-        self.subwindow_button = ctk.CTkButton(self.button_frame, text="Изменить только на SubWindow",
-                                              command=self.run_with_subwindow, font=font, width=300,
-                                              height=50)
+        self.subwindow_button = ctk.CTkButton(
+            self.button_frame,
+            text="Изменить только на SubWindow",
+            command=self.run_with_subwindow,
+            font=font,
+            width=300,
+            height=50,
+        )
         self.subwindow_button.pack(anchor="e", side="left", expand=True)
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
     def select_file(self, file_type):
-        file_types = [("IEC_HMI files", "*.iec_hmi")] if file_type in ['iec_hmi', 'ib_iec_hmi'] else [
-            ("Text files", "*.txt")]
+        file_types = (
+            [("IEC_HMI files", "*.iec_hmi")]
+            if file_type in ["iec_hmi", "ib_iec_hmi"]
+            else [("Text files", "*.txt")]
+        )
         selected_file = filedialog.askopenfilename(filetypes=file_types)
         if selected_file:
             self.controller.selected_files[file_type] = selected_file
-            if file_type == 'iec_hmi':
+            if file_type == "iec_hmi":
                 self.file_label.configure(text=f"Выбран файл: {selected_file}")
-            elif file_type == 'graphics':
+            elif file_type == "graphics":
                 self.graphics_label.configure(text=f"Выбран файл: {selected_file}")
-            elif file_type == 'subwindow':
+            elif file_type == "subwindow":
                 self.subwindow_label.configure(text=f"Выбран файл: {selected_file}")
-            elif file_type == 'ib_iec_hmi':
-                self.controller.frames["IBManagerFrame"].ib_file_label.configure(text=f"Выбран файл: {selected_file}")
+            elif file_type == "ib_iec_hmi":
+                self.controller.frames["IBManagerFrame"].ib_file_label.configure(
+                    text=f"Выбран файл: {selected_file}"
+                )
         else:
-            if file_type == 'iec_hmi':
+            if file_type == "iec_hmi":
                 self.file_label.configure(text="Выберите файл .iec_hmi:")
-            elif file_type == 'graphics':
-                self.graphics_label.configure(text="Выберите файл GraphicsCompositeType.txt:")
-            elif file_type == 'subwindow':
+            elif file_type == "graphics":
+                self.graphics_label.configure(
+                    text="Выберите файл GraphicsCompositeType.txt:"
+                )
+            elif file_type == "subwindow":
                 self.subwindow_label.configure(text="Выберите файл TSubWindowType.txt:")
-            elif file_type == 'ib_iec_hmi':
-                self.controller.frames["IBManagerFrame"].ib_file_label.configure(text="Выберите СТАРЫЙ файл .iec_hmi:")
+            elif file_type == "ib_iec_hmi":
+                self.controller.frames["IBManagerFrame"].ib_file_label.configure(
+                    text="Выберите СТАРЫЙ файл .iec_hmi:"
+                )
 
     def run_main(self):
-        if self.controller.selected_files['iec_hmi']:
-            if not self.controller.selected_files['graphics']:
-                self.error_text.insert("end", "\n\n   Файл с расширением GraphicsCompositeType.txt не выбран")
+        if self.controller.selected_files["iec_hmi"]:
+            if not self.controller.selected_files["graphics"]:
+                self.error_text.insert(
+                    "end",
+                    "\n\n   Файл с расширением GraphicsCompositeType.txt не выбран",
+                )
                 return
-            if not self.controller.selected_files['subwindow']:
-                self.error_text.insert("end", "\n\n   Файл с расширением TSubWindowType.txt не выбран")
+            if not self.controller.selected_files["subwindow"]:
+                self.error_text.insert(
+                    "end", "\n\n   Файл с расширением TSubWindowType.txt не выбран"
+                )
                 return
 
             command = [
-                self.controller.selected_files['iec_hmi'],
-                '--graphics', self.controller.selected_files['graphics'],
-                '--subwindow', self.controller.selected_files['subwindow']
+                self.controller.selected_files["iec_hmi"],
+                "--graphics",
+                self.controller.selected_files["graphics"],
+                "--subwindow",
+                self.controller.selected_files["subwindow"],
             ]
             main_core(command)  # Вызов функции main_core
 
-            self.error_text.insert("end",
-                                   "\n\n   Изменение всех окон завершено, результат сохранен в файл result.iec_hmi")
+            self.error_text.insert(
+                "end",
+                "\n\n   Изменение всех окон завершено, результат сохранен в файл result.iec_hmi",
+            )
         else:
-            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi не выбран")
+            self.error_text.insert(
+                "end", "\n\n   Файл с расширением .iec_hmi не выбран"
+            )
 
     def run_with_graphics(self):
-        if self.controller.selected_files['iec_hmi'] and self.controller.selected_files['graphics']:
+        if (
+            self.controller.selected_files["iec_hmi"]
+            and self.controller.selected_files["graphics"]
+        ):
             command = [
-                self.controller.selected_files['iec_hmi'],
-                '--graphics', self.controller.selected_files['graphics']
+                self.controller.selected_files["iec_hmi"],
+                "--graphics",
+                self.controller.selected_files["graphics"],
             ]
             main_core(command)  # Вызов функции main_core
-            self.error_text.insert("end",
-                                   "\n\n   Изменение окон на GraphicsComposite завершено,"
-                                   " результат сохранен в файл result.iec_hmi")
+            self.error_text.insert(
+                "end",
+                "\n\n   Изменение окон на GraphicsComposite завершено,"
+                " результат сохранен в файл result.iec_hmi",
+            )
         else:
-            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi или GraphicsCompositeType.txt не выбран")
+            self.error_text.insert(
+                "end",
+                "\n\n   Файл с расширением .iec_hmi или GraphicsCompositeType.txt не выбран",
+            )
 
     def run_with_subwindow(self):
-        if self.controller.selected_files['iec_hmi'] and self.controller.selected_files['subwindow']:
+        if (
+            self.controller.selected_files["iec_hmi"]
+            and self.controller.selected_files["subwindow"]
+        ):
             command = [
-                self.controller.selected_files['iec_hmi'],
-                '--subwindow', self.controller.selected_files['subwindow']
+                self.controller.selected_files["iec_hmi"],
+                "--subwindow",
+                self.controller.selected_files["subwindow"],
             ]
             main_core(command)  # Вызов функции main_core
-            self.error_text.insert("end",
-                                   "\n\n   Изменение окон на SubWindow завершено,"
-                                   " результат сохранен в файл result.iec_hmi")
+            self.error_text.insert(
+                "end",
+                "\n\n   Изменение окон на SubWindow завершено,"
+                " результат сохранен в файл result.iec_hmi",
+            )
         else:
-            self.error_text.insert("end", "\n\n   Файл с расширением .iec_hmi или TSubWindowType.txt не выбран")
+            self.error_text.insert(
+                "end",
+                "\n\n   Файл с расширением .iec_hmi или TSubWindowType.txt не выбран",
+            )
 
 
 def copy_selected_text(event):
@@ -252,7 +389,9 @@ def copy_selected_text(event):
 def show_notification():
     notification_window = tk.Toplevel()
     notification_window.overrideredirect(True)  # Без границ и заголовка
-    notification_label = tk.Label(notification_window, text="Текст скопирован!", font=("Arial", 12), fg="black")
+    notification_label = tk.Label(
+        notification_window, text="Текст скопирован!", font=("Arial", 12), fg="black"
+    )
     notification_label.pack()
 
     # Указываем координаты для верхнего левого угла экрана
@@ -271,29 +410,63 @@ class SearchFrame(ctk.CTkFrame):
         font = get_font()
 
         # Основной фрейм для кнопок
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(pady=20)
+        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame.pack(pady=(10, 10), padx=50, fill="x")
 
-        # Кнопка поиска строк hid to hide
-        self.find_hid_to_hide_button = ctk.CTkButton(button_frame, text="Найти hid to hide",
-                                                     command=self.find_hid_to_hide, font=font,
-                                                     width=300, height=50)
-        self.find_hid_to_hide_button.pack(side=tk.LEFT, padx=(0, 20))
+        # Кнопка поиска hid to hide
+        self.find_hid_to_hide_button = ctk.CTkButton(
+            self.button_frame,
+            text="Найти hid to hide",
+            command=self.find_hid_to_hide,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.find_hid_to_hide_button.grid(row=0, column=0, padx=(0, 5))
 
-        # Кнопка поиска использования выбранных окон
-        self.find_window_usage_button = ctk.CTkButton(button_frame, text="Найти использование окон",
-                                                      command=self.find_window_usage, font=font,
-                                                      width=300, height=50)
-        self.find_window_usage_button.pack(side=tk.LEFT, padx=(20, 20))
+        # Кнопка поиска использования окон
+        self.find_window_usage_button = ctk.CTkButton(
+            self.button_frame,
+            text="Найти использование окон",
+            command=self.find_window_usage,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.find_window_usage_button.grid(row=0, column=1, padx=5)
 
         # Кнопка поиска неиспользуемых окон
-        self.find_unused_windows_button = ctk.CTkButton(button_frame, text="Найти неиспользуемые окна",
-                                                        command=self.find_unused_windows, font=font,
-                                                        width=300, height=50)
-        self.find_unused_windows_button.pack(side=tk.LEFT, padx=(20, 0))
+        self.find_unused_windows_button = ctk.CTkButton(
+            self.button_frame,
+            text="Найти неиспользуемые окна",
+            command=self.find_unused_windows,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.find_unused_windows_button.grid(row=0, column=2, padx=5)
+
+        # Кнопка поиска неиспользуемых окон
+        self.find_users_button = ctk.CTkButton(
+            self.button_frame,
+            text="Найти user",
+            command=self.find_users,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.find_users_button.grid(row=0, column=3, padx=(5, 0))
+
+        # Конфигурация столбцов фрейма
+        self.button_frame.grid_columnconfigure(0, weight=1)
+        self.button_frame.grid_columnconfigure(1, weight=1)
+        self.button_frame.grid_columnconfigure(2, weight=1)
+        self.button_frame.grid_columnconfigure(3, weight=1)
 
         # Окно с сообщениями
-        self.message_label = ctk.CTkLabel(self, text="Сообщения:", font=font, anchor="w")
+        self.message_label = ctk.CTkLabel(
+            self, text="Сообщения:", font=font, anchor="w"
+        )
         self.message_label.pack(pady=(10, 5), padx=50, anchor="w")
 
         self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", font=font)
@@ -311,23 +484,22 @@ class SearchFrame(ctk.CTkFrame):
         selected_file = filedialog.askopenfilename(filetypes=file_types)
         if selected_file:
             # Обработка выбора файла .iec_hmi
-            self.controller.selected_files['iec_hmi'] = selected_file
+            self.controller.selected_files["iec_hmi"] = selected_file
             self.select_iec_hmi_label.configure(text=f"Выбран файл: {selected_file}")
 
     def find_hid_to_hide(self):
         self.error_text.configure(state="normal")
-        if not self.controller.selected_files['iec_hmi']:
+        if not self.controller.selected_files["iec_hmi"]:
             # Handle case where no .iec_hmi file is selected
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Выберите файл .iec_hmi сначала.")
             self.error_text.configure(state="disabled")
             return
 
-        iec_hmi_file = self.controller.selected_files['iec_hmi']
+        iec_hmi_file = self.controller.selected_files["iec_hmi"]
         matches = finder.find_hid_to_hide(iec_hmi_file)
 
         if matches:
-
             # Очистка текстового поля перед выводом новых сообщений
             self.error_text.delete(1.0, tk.END)
 
@@ -342,7 +514,7 @@ class SearchFrame(ctk.CTkFrame):
 
     def find_window_usage(self):
         self.error_text.configure(state="normal")
-        if not self.controller.selected_files['iec_hmi']:
+        if not self.controller.selected_files["iec_hmi"]:
             # Handle case where no .iec_hmi file is selected
 
             self.error_text.delete(1.0, tk.END)
@@ -350,10 +522,12 @@ class SearchFrame(ctk.CTkFrame):
             self.error_text.configure(state="disabled")
             return
 
-        iec_hmi_file = self.controller.selected_files['iec_hmi']
-        graphics_label_file = self.controller.selected_files['graphics']
-        subwindow_label_file = self.controller.selected_files['subwindow']
-        matches = finder.find_window_usage(iec_hmi_file, graphics_label_file, subwindow_label_file)
+        iec_hmi_file = self.controller.selected_files["iec_hmi"]
+        graphics_label_file = self.controller.selected_files["graphics"]
+        subwindow_label_file = self.controller.selected_files["subwindow"]
+        matches = finder.find_window_usage(
+            iec_hmi_file, graphics_label_file, subwindow_label_file
+        )
 
         if matches:
             # Очистка текстового поля перед выводом новых сообщений
@@ -371,14 +545,14 @@ class SearchFrame(ctk.CTkFrame):
 
     def find_unused_windows(self):
         self.error_text.configure(state="normal")
-        if not self.controller.selected_files['iec_hmi']:
+        if not self.controller.selected_files["iec_hmi"]:
             # Handle case where no .iec_hmi file is selected
             self.error_text.delete(1.0, tk.END)
             self.error_text.insert(tk.END, "Выберите файл .iec_hmi сначала.")
             self.error_text.configure(state="disabled")
             return
 
-        iec_hmi_file = self.controller.selected_files['iec_hmi']
+        iec_hmi_file = self.controller.selected_files["iec_hmi"]
         unused_windows = finder.find_unused_windows(iec_hmi_file)
 
         if unused_windows:
@@ -395,25 +569,65 @@ class SearchFrame(ctk.CTkFrame):
 
         self.error_text.configure(state="disabled")
 
+    def find_users(self):
+        self.error_text.configure(state="normal")
+
+        if not self.controller.selected_files["iec_hmi"]:
+            # Handle case where no .iec_hmi file is selected
+            self.error_text.delete(1.0, tk.END)
+            self.error_text.insert(tk.END, "Выберите файл .iec_hmi сначала.")
+            self.error_text.configure(state="disabled")
+            return
+
+        iec_hmi_file = self.controller.selected_files["iec_hmi"]
+
+        # Вызов функции из finder.py для поиска пользователей
+        matches = finder.find_user_blocks(iec_hmi_file)
+
+        if matches:
+            # Очистка текстового поля перед выводом новых сообщений
+            self.error_text.delete(1.0, tk.END)
+
+            # Вывод найденных строк в текстовое поле
+            self.error_text.insert(
+                tk.END, "Найдены следующие блоки с использованием USER:\n"
+            )
+            for match in matches:
+                self.error_text.insert(tk.END, f"{match}\n")
+        else:
+            self.error_text.delete(1.0, tk.END)
+            self.error_text.insert(tk.END, "Не найдено совпадений.")
+
+        self.error_text.configure(state="disabled")
+
 
 class IBManagerFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+        self.nod_file_checkboxes = {}
         font = get_font()
 
         # Окно выбора файла .iec_hmi
         self.ib_file_frame = ctk.CTkFrame(self)
         self.ib_file_frame.pack(pady=(20, 5), padx=50, fill="x")
 
-        self.ib_file_label = ctk.CTkLabel(self.ib_file_frame, text="Выберите СТАРЫЙ файл .iec_hmi:",
-                                          font=font)
+        self.ib_file_label = ctk.CTkLabel(
+            self.ib_file_frame,
+            text="Выберите СТАРЫЙ файл .iec_hmi:",
+            wraplength=880,
+            font=font,
+        )
         self.ib_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.ib_file_button = ctk.CTkButton(self.ib_file_frame, text="Выбрать файл",
-                                            command=lambda: self.select_file('ib_iec_hmi', self.ib_file_label),
-                                            font=font,
-                                            width=200, height=50)
+        self.ib_file_button = ctk.CTkButton(
+            self.ib_file_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("ib_iec_hmi", self.ib_file_label),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.ib_file_button.grid(row=0, column=1, sticky="e")
 
         self.ib_file_frame.grid_columnconfigure(1, weight=1)
@@ -422,13 +636,22 @@ class IBManagerFrame(ctk.CTkFrame):
         self.design_folder_frame = ctk.CTkFrame(self)
         self.design_folder_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.design_folder_label = ctk.CTkLabel(self.design_folder_frame, text="Выберите папку Design:",
-                                                font=font)
+        self.design_folder_label = ctk.CTkLabel(
+            self.design_folder_frame,
+            wraplength=880,
+            text="Выберите папку Design:",
+            font=font,
+        )
         self.design_folder_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.design_folder_button = ctk.CTkButton(self.design_folder_frame, text="Выбрать папку",
-                                                  command=self.select_folder, font=font,
-                                                  width=200, height=50)
+        self.design_folder_button = ctk.CTkButton(
+            self.design_folder_frame,
+            text="Выбрать папку",
+            command=self.select_folder,
+            font=font,
+            width=200,
+            height=50,
+        )
         self.design_folder_button.grid(row=0, column=1, sticky="e")
 
         self.design_folder_frame.grid_columnconfigure(1, weight=1)
@@ -437,13 +660,19 @@ class IBManagerFrame(ctk.CTkFrame):
         self.prj_file_frame = ctk.CTkFrame(self)
         self.prj_file_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.prj_file_label = ctk.CTkLabel(self.prj_file_frame, text="Выберите файл .prj:", font=font)
+        self.prj_file_label = ctk.CTkLabel(
+            self.prj_file_frame, text="Выберите файл .prj:", wraplength=880, font=font
+        )
         self.prj_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.prj_file_button = ctk.CTkButton(self.prj_file_frame, text="Выбрать файл",
-                                             command=lambda: self.select_file('prj', self.prj_file_label),
-                                             font=font,
-                                             width=200, height=50)
+        self.prj_file_button = ctk.CTkButton(
+            self.prj_file_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("prj", self.prj_file_label),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.prj_file_button.grid(row=0, column=1, sticky="e")
 
         self.prj_file_frame.grid_columnconfigure(1, weight=1)
@@ -452,14 +681,22 @@ class IBManagerFrame(ctk.CTkFrame):
         self.mnemo_file_frame = ctk.CTkFrame(self)
         self.mnemo_file_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.mnemo_file_label = ctk.CTkLabel(self.mnemo_file_frame, text="Выберите файл .int mnemo:",
-                                             font=font)
+        self.mnemo_file_label = ctk.CTkLabel(
+            self.mnemo_file_frame,
+            wraplength=880,
+            text="Выберите файл .int mnemo:",
+            font=font,
+        )
         self.mnemo_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.mnemo_file_button = ctk.CTkButton(self.mnemo_file_frame, text="Выбрать файл",
-                                               command=lambda: self.select_file('int_mnemo', self.mnemo_file_label),
-                                               font=font,
-                                               width=200, height=50)
+        self.mnemo_file_button = ctk.CTkButton(
+            self.mnemo_file_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file("int_mnemo", self.mnemo_file_label),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.mnemo_file_button.grid(row=0, column=1, sticky="e")
 
         self.mnemo_file_frame.grid_columnconfigure(1, weight=1)
@@ -468,15 +705,24 @@ class IBManagerFrame(ctk.CTkFrame):
         self.event_logger_file_frame = ctk.CTkFrame(self)
         self.event_logger_file_frame.pack(pady=(10, 5), padx=50, fill="x")
 
-        self.event_logger_file_label = ctk.CTkLabel(self.event_logger_file_frame,
-                                                    text="Выберите файл .int event logger:", font=font)
+        self.event_logger_file_label = ctk.CTkLabel(
+            self.event_logger_file_frame,
+            text="Выберите файл .int event logger:",
+            wraplength=880,
+            font=font,
+        )
         self.event_logger_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
 
-        self.event_logger_file_button = ctk.CTkButton(self.event_logger_file_frame, text="Выбрать файл",
-                                                      command=lambda: self.select_file('int_event_logger',
-                                                                                       self.event_logger_file_label),
-                                                      font=font,
-                                                      width=200, height=50)
+        self.event_logger_file_button = ctk.CTkButton(
+            self.event_logger_file_frame,
+            text="Выбрать файл",
+            command=lambda: self.select_file(
+                "int_event_logger", self.event_logger_file_label
+            ),
+            font=font,
+            width=200,
+            height=50,
+        )
         self.event_logger_file_button.grid(row=0, column=1, sticky="e")
 
         self.event_logger_file_frame.grid_columnconfigure(1, weight=1)
@@ -485,55 +731,136 @@ class IBManagerFrame(ctk.CTkFrame):
         self.button_frame = ctk.CTkFrame(self)
         self.button_frame.pack(pady=(10, 10), padx=50, fill="x")
 
-        self.ib_manager_button = ctk.CTkButton(self.button_frame, text="Перенести палитры",
-                                               command=self.run_ib_command, font=font, width=300,
-                                               height=50)
+        self.ib_manager_button = ctk.CTkButton(
+            self.button_frame,
+            text="Перенести палитры",
+            command=self.run_ib_command,
+            font=font,
+            width=300,
+            height=50,
+        )
         self.ib_manager_button.grid(row=0, column=0, padx=(0, 5))
 
-        self.change_font_button = ctk.CTkButton(self.button_frame, text="Изменить шрифт",
-                                                command=self.change_font, font=font, width=300,
-                                                height=50)
+        self.change_font_button = ctk.CTkButton(
+            self.button_frame,
+            text="Изменить шрифт",
+            command=self.change_font,
+            font=font,
+            width=300,
+            height=50,
+        )
         self.change_font_button.grid(row=0, column=1, padx=5)
 
-        self.add_variables_button = ctk.CTkButton(self.button_frame, text="Добавить переменные",
-                                                  command=self.add_variables, font=font, width=300,
-                                                  height=50)
+        self.add_variables_button = ctk.CTkButton(
+            self.button_frame,
+            text="Добавить переменные",
+            command=self.add_variables,
+            font=font,
+            width=300,
+            height=50,
+        )
         self.add_variables_button.grid(row=0, column=2, padx=5)
 
-        self.add_files_button = ctk.CTkButton(self.button_frame, text="Добавить файлы",
-                                              command=self.add_files, font=font, width=300,
-                                              height=50)
-        self.add_files_button.grid(row=0, column=3, padx=(5, 0))
+        self.add_files_button = ctk.CTkButton(
+            self.button_frame,
+            text="Добавить файлы",
+            command=self.add_files,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.add_files_button.grid(row=0, column=3, padx=(5, 5))
+
+        self.add_HMI_button = ctk.CTkButton(
+            self.button_frame,
+            text="Добавить в HMI",
+            command=self.add_HMI,
+            font=font,
+            width=300,
+            height=50,
+        )
+        self.add_HMI_button.grid(row=0, column=4, padx=(5, 0))
 
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
         self.button_frame.grid_columnconfigure(2, weight=1)
         self.button_frame.grid_columnconfigure(3, weight=1)
+        self.button_frame.grid_columnconfigure(4, weight=1)
 
         # Путь к выбранной папке Design
         self.selected_folder = None
-
         # Окно с сообщениями
-        self.message_label = ctk.CTkLabel(self, text="Сообщения:", font=font, anchor="w")
+        self.message_label = ctk.CTkLabel(
+            self, text="Сообщения:", font=font, anchor="w"
+        )
         self.message_label.pack(pady=(0, 5), padx=50, anchor="w")
 
-        self.error_text = ctk.CTkTextbox(self, height=5, wrap="word", state="normal")
-        self.error_text.pack(fill="both", expand=True, padx=50, pady=(0, 10))
+        self.error_text = ctk.CTkTextbox(self, height=100, wrap="word", state="normal")
+        self.error_text.pack(fill="both", expand=False, padx=50, pady=(0, 10))
+
+        self.table_frame = ctk.CTkFrame(self)
+        self.table_frame.pack(side="left", pady=(5, 0), padx=(50, 5), fill="x")
+
+        # Новый фрейм для кнопки "Распространить на узлы"
+        self.spread_to_nodes_frame = ctk.CTkFrame(self)
+        self.spread_to_nodes_frame.pack(
+            side="left", pady=(0, 0), padx=(5, 50), fill="x"
+        )
+
+        self.spread_to_nodes_button = ctk.CTkButton(
+            self.spread_to_nodes_frame,
+            text="Распространить на узлы",
+            command=self.spread_to_nodes,
+            font=font,
+            width=200,
+            height=50,
+        )
+        self.spread_to_nodes_button.pack(pady=0)
+
+        #        # Второй ряд кнопок
+        #        self.button_frame = ctk.CTkFrame(self)
+        #        self.button_frame.pack(pady=(0, 10), padx=50, fill="x")
+        #
+        #        self.add_HMI_button = ctk.CTkButton(self.button_frame, text="Добавить в HMI",
+        #                                               command=self.add_HMI, font=font, width=300,
+        #                                               height=50)
+        #        self.add_HMI_button.grid(row=0, column=0, padx=(0, 5))
+        #
+        #       self.change_font_button = ctk.CTkButton(self.button_frame, text="Изменить шрифт",
+        #                                                 font=font, width=300,
+        #                                                height=50)
+        #        self.change_font_button.grid(row=0, column=1, padx=5)
+        #
+        #        self.add_variables_button = ctk.CTkButton(self.button_frame, text="Добавить переменные",
+        #                                                   font=font, width=300,
+        #                                                  height=50)
+        #        self.add_variables_button.grid(row=0, column=2, padx=5)
+        #
+        #        self.add_files_button = ctk.CTkButton(self.button_frame, text="Добавить файлы",
+        #                                               font=font, width=300,
+        #                                              height=50)
+        #        self.add_files_button.grid(row=0, column=3, padx=(5, 0))
+
+        #        self.button_frame.grid_columnconfigure(0, weight=1)
+        #       self.button_frame.grid_columnconfigure(1, weight=1)
+        #       self.button_frame.grid_columnconfigure(2, weight=1)
+        #       self.button_frame.grid_columnconfigure(3, weight=1)
 
     def select_file(self, file_type, label):
         file_types = {
-            'ib_iec_hmi': [('IEC HMI Files', '*.iec_hmi')],
-            'prj': [('PRJ Files', '*.prj')],
-            'int_mnemo': [('INT Mnemo Files', '*.int')],
-            'int_event_logger': [('INT Event Logger Files', '*.int')]
+            "ib_iec_hmi": [("IEC HMI Files", "*.iec_hmi")],
+            "prj": [("PRJ Files", "*.prj")],
+            "int_mnemo": [("INT Mnemo Files", "*.int")],
+            "int_event_logger": [("INT Event Logger Files", "*.int")],
         }
 
         file_path = filedialog.askopenfilename(filetypes=file_types[file_type])
         if file_path:
             self.controller.selected_files[file_type] = file_path
             label.configure(text=f"Выбран файл: {file_path}")
-            self.controller.frames["IBManagerFrame"].error_text.insert("end",
-                                                                       f"\n\n   Выбран файл ({file_type}): {file_path}")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", f"\n\n   Выбран файл ({file_type}): {file_path}"
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
     def select_folder(self):
@@ -542,57 +869,145 @@ class IBManagerFrame(ctk.CTkFrame):
             if folder_path:
                 self.selected_folder = folder_path
                 self.design_folder_label.configure(text=f"Выбрана папка: {folder_path}")
-                self.controller.frames["IBManagerFrame"].error_text.insert("end",
-                                                                           f"\n\n   Выбрана папка: {folder_path}")
+                self.controller.frames["IBManagerFrame"].error_text.insert(
+                    "end", f"\n\n   Выбрана папка: {folder_path}"
+                )
                 self.controller.frames["IBManagerFrame"].error_text.see("end")
         except Exception as e:
             print(f"Error selecting folder: {e}")  # Отладочное сообщение
 
     def run_ib_command(self):
-        if self.controller.selected_files['ib_iec_hmi']:
-            file_path = self.controller.selected_files['ib_iec_hmi']
+        if self.controller.selected_files["ib_iec_hmi"]:
+            file_path = self.controller.selected_files["ib_iec_hmi"]
             execute_ib_command(file_path)  # Вызов функции из changer.py
 
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Файл успешно обновлен.")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Файл успешно обновлен."
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
-            self.controller.frames["IBManagerFrame"].error_text.insert("end",
-                                                                       "\n\n   Файл с расширением iec_hmi не выбран")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Файл с расширением iec_hmi не выбран"
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
 
     def change_font(self):
-        if self.controller.selected_files['iec_hmi']:
-            file_path = self.controller.selected_files['iec_hmi']
+        if self.controller.selected_files["iec_hmi"]:
+            file_path = self.controller.selected_files["iec_hmi"]
             change_font_in_file(file_path)  # Вызов функции из changer.py
 
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Шрифты успешно обновлены.")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Шрифты успешно обновлены."
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
-            self.controller.frames["IBManagerFrame"].error_text.insert("end",
-                                                                       "\n\n   Файл с расширением iec_hmi не выбран")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Файл с расширением iec_hmi не выбран"
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
+
+    def search_nod_files(self, folder_path):
+        nod_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith(".nod"):
+                    file_path = os.path.join(root, file)
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "<Node Name=" in line:
+                                name = line.split('"')[1]
+                                nod_files.append((name, file_path))
+                                break
+        return nod_files
 
     def add_files(self):
         if self.selected_folder:
             add_files_to_design(self.selected_folder)  # Вызов функции из changer.py
+            nod_files = self.search_nod_files(self.selected_folder)
+            self.display_table(nod_files)
 
-            self.controller.frames["IBManagerFrame"].error_text.insert("end",
-                                                                       f"\n\n   Файлы добавлены в папку: {self.selected_folder}")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", f"\n\n   Файлы добавлены в папку: {self.selected_folder}"
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
         else:
-            self.controller.frames["IBManagerFrame"].error_text.insert("end", "\n\n   Папка не выбрана.")
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Папка не выбрана."
+            )
             self.controller.frames["IBManagerFrame"].error_text.see("end")
+
+    def display_table(self, nod_files):
+        for widget in self.table_frame.winfo_children():
+            widget.destroy()
+
+        headers = ["Имя узла", "AT_SettingsPgSQL", "AT_IB_Event"]
+        for col, header in enumerate(headers):
+            header_label = ctk.CTkLabel(self.table_frame, text=header)
+            header_label.grid(row=0, column=col, padx=10, pady=5)
+
+        self.nod_file_checkboxes = {}  # Очистим словарь перед использованием
+
+        for row, (name, file_path) in enumerate(nod_files, start=1):
+            name_label = ctk.CTkLabel(self.table_frame, text=name)
+            name_label.grid(row=row, column=0, padx=10, pady=5)
+
+            at_settings_checkbox = ctk.CTkCheckBox(self.table_frame, text="")
+            at_settings_checkbox.grid(row=row, column=1, padx=10, pady=5)
+
+            at_ib_checkbox = ctk.CTkCheckBox(self.table_frame, text="")
+            at_ib_checkbox.grid(row=row, column=2, padx=10, pady=5)
+
+            self.nod_file_checkboxes[file_path] = (at_settings_checkbox, at_ib_checkbox)
+
+    def get_checked_nod_files(self):
+        checked_nod_files = []
+        for file_path, (settings_cb, ib_cb) in self.nod_file_checkboxes.items():
+            if settings_cb.get() or ib_cb.get():
+                checked_nod_files.append((file_path, settings_cb.get(), ib_cb.get()))
+        return checked_nod_files
+
+    def spread_to_nodes(self):
+        try:
+            if self.selected_folder:
+                checked_nod_files = self.get_checked_nod_files()
+                if checked_nod_files:
+                    from changer import spread_to_nodes_function
+
+                    spread_to_nodes_function(
+                        checked_nod_files
+                    )  # Call the function from changer.py
+                    self.display_message(
+                        "Данные успешно распространены на узлы.", "success"
+                    )
+                else:
+                    self.display_message(
+                        "Не выбраны узлы для распространения данных.", "error"
+                    )
+            else:
+                self.display_message(
+                    "Папка не выбрана для добавления данных в узлы.", "error"
+                )
+        except Exception as e:
+            self.display_message(
+                f"Ошибка при распространении данных на узлы: {e}", "error"
+            )
 
     def add_variables(self):
         try:
-            if self.controller.selected_files['prj'] and self.controller.selected_files['int_mnemo'] and \
-                    self.controller.selected_files['int_event_logger']:
-                prj_file = self.controller.selected_files['prj']
-                mnemo_file = self.controller.selected_files['int_mnemo']
-                event_logger_file = self.controller.selected_files['int_event_logger']
+            if (
+                self.controller.selected_files["prj"]
+                and self.controller.selected_files["int_mnemo"]
+                and self.controller.selected_files["int_event_logger"]
+            ):
+                prj_file = self.controller.selected_files["prj"]
+                mnemo_file = self.controller.selected_files["int_mnemo"]
+                event_logger_file = self.controller.selected_files["int_event_logger"]
 
                 from changer import add_variables_to_files
-                add_variables_to_files(prj_file, mnemo_file, event_logger_file)  # Вызов функции из changer.py
+
+                add_variables_to_files(
+                    prj_file, mnemo_file, event_logger_file
+                )  # Вызов функции из changer.py
 
                 self.display_message("Переменные добавлены в файлы.", "success")
             else:
@@ -611,6 +1026,22 @@ class IBManagerFrame(ctk.CTkFrame):
         self.error_text.insert("end", f"\n\n   {prefix} {message}")
         self.error_text.see("end")
 
+    def add_HMI(self):
+        if self.controller.selected_files["iec_hmi"]:
+            file_path = self.controller.selected_files["iec_hmi"]
+            add_HMI_to_files(file_path)  # Вызов функции из changer.py
+
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end",
+                "\n\n   Добавлена папка IB, ресурс IS.png, а также импортированы  TButtonUser и TIS_Admin.",
+            )
+            self.controller.frames["IBManagerFrame"].error_text.see("end")
+        else:
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Файл с расширением iec_hmi не выбран"
+            )
+            self.controller.frames["IBManagerFrame"].error_text.see("end")
+
 
 class UsersFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -620,30 +1051,362 @@ class UsersFrame(ctk.CTkFrame):
 
         # Создание текстового виджета с CustomTkinter
         self.text_widget = ctk.CTkTextbox(self, height=5, wrap="word", font=font)
-        self.text_widget.pack(pady=(20, 50), padx=50, anchor="w", fill="both", expand=True)
+        self.text_widget.pack(
+            pady=(20, 50), padx=50, anchor="w", fill="both", expand=True
+        )
 
         # Добавление текста в виджет
-        self.text_widget.insert("1.0", "\n🤓Модная разработка Яцышина и Чепусова🤓\n")
-        self.text_widget.insert("end",
-                                "\nИнструкция с полным описанием работы программы находиться в файле IB_Manager.docx\n")
-        self.text_widget.insert("end",
-                                "\nВсе вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru🙈🙉🙊\n\n\n")
-        self.text_widget.insert("end", "\nПО для автоматической аткуализации проектов Sonata V1.0.\n")
+        text = """
+        Модная разработка Яцышина и Чепусова
+
+        Программа IB Velocity ускоряет внедрение ИБ и перевод проектов Сонаты на версию 12288.
+
+        IB Velocity позволяет:
+
+        1. Автоматически менять типы окон с TWindow на TGraphicsComposite и TSubWindow.
+        2. Переносить палитры.
+        3. Заменять шрифты на необходимые для проектов по AstraLinux.
+        4. Добавлять необходимые для ИБ переменные и файлы, а также элементы для мнемосхемы.
+        5. Распространять на узлы приложения ИБ.
+        6. Изменять окно Events, добавляя права и регистрацию сообщений.
+
+        Так же IB Velocity обладает улучшенным поиском элементов на мнемосхеме, который позволяет искать:
+
+        - Пересечения hid to hide.
+        - Использование определенных окон.
+        - Неиспользуемые окна.
+        - Привязки к пользователям.
+
+        Инструкция с полным описанием работы программы находится в файле IB_Velocity.docx.
+
+        Все вопросы/предложения/сообщения об ошибках - yatsyshin@vega-gaz.ru.
+
+        ПО для автоматической актуализации проектов Sonata V1.5.
+        """
+
+        self.text_widget.insert("1.0", text)
+
+
 
         # Отключение редактирования текста
         self.text_widget.configure(state="disabled")
 
+''' Доделать
+class ScrollableOptionMenu(ctk.CTkFrame):
+    def __init__(self, parent, values, command=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.values = sorted(values)  # Сортируем значения в алфавитном порядке
+        self.command = command
 
+        self.var = tk.StringVar(value="Select Name")
+
+        # Create a button to act as the dropdown trigger
+        self.dropdown_button = ctk.CTkButton(
+            self, textvariable=self.var, command=self._toggle_menu
+        )
+        self.dropdown_button.pack(fill=tk.X)
+
+        self.menu_frame = ctk.CTkFrame(self)
+        self.listbox = tk.Listbox(self.menu_frame, selectmode=tk.SINGLE)
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.scrollbar = tk.Scrollbar(self.menu_frame, orient=tk.VERTICAL)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.listbox.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.config(command=self.listbox.yview)
+
+        for value in self.values:  # Используем отсортированный список
+            self.listbox.insert(tk.END, value)
+
+        # Bind events specifically to the listbox
+        self.listbox.bind("<<ListboxSelect>>", self._on_select)
+        self.listbox.bind("<MouseWheel>", self._on_mousewheel)  # Bind to Listbox only
+
+        self.menu_open = False
+
+    def _toggle_menu(self):
+        if self.menu_open:
+            self.menu_frame.pack_forget()
+        else:
+            self.menu_frame.pack(fill=tk.BOTH, expand=True)
+            self.listbox.focus_set()  # Set focus to Listbox to handle MouseWheel events properly
+        self.menu_open = not self.menu_open
+
+    def _on_select(self, event):
+        selection_indices = self.listbox.curselection()
+        if selection_indices:
+            selection = self.listbox.get(selection_indices[0])
+            self.var.set(selection)
+            self.menu_frame.pack_forget()
+            self.menu_open = False
+            if self.command:
+                self.command(selection)
+
+    def _on_mousewheel(self, event):
+        # Ensure that the listbox is still valid and exists
+        if self.listbox and self.listbox.winfo_exists():
+            try:
+                # Determine scroll amount based on the wheel delta
+                scroll_amount = int(-1 * (event.delta / 120))
+                self.listbox.yview_scroll(scroll_amount, "units")
+                # Ensure the Listbox remains focused
+                self.listbox.focus_set()
+                # Prevent default handling of the event
+                return "break"
+            except Exception as e:
+                print(f"Error in mousewheel scrolling: {e}")
+'''
+class EmbedFrame(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        # Окно выбора файла .iec_hmi
+        self.ib_file_frame = ctk.CTkFrame(self)
+        self.ib_file_frame.pack(pady=(20, 5), padx=50, fill="x")
+
+        self.ib_file_label = ctk.CTkLabel(
+            self.ib_file_frame,
+            text="Введите название окна Event:",
+            wraplength=880,
+        )
+        self.ib_file_label.grid(row=0, column=0, padx=(10, 10), sticky="w")
+
+        self.ib_file_entry = ctk.CTkEntry(self.ib_file_frame, width=300)
+        self.ib_file_entry.grid(row=0, column=1, padx=(10, 10), sticky="w")
+
+        self.ib_add_rights_button = ctk.CTkButton(
+            self.ib_file_frame,
+            text="Добавить права",
+            command=lambda: self.add_event(self.ib_file_entry.get()),
+            width=200,
+            height=50,
+        )
+        self.ib_add_rights_button.grid(
+            row=0, column=2, pady=(0, 0), padx=(10, 0), sticky="e"
+        )
+        
+    def add_event(self, event_name):
+        if self.controller.selected_files["iec_hmi"]:
+            file_path = self.controller.selected_files["iec_hmi"]
+            add_event_to_files(
+                file_path, event_name
+            )  # Вызов функции с двумя параметрами
+
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Добавлены права и регистрация сообщения в Event."
+            )
+            self.controller.frames["IBManagerFrame"].error_text.see("end")
+        else:
+            self.controller.frames["IBManagerFrame"].error_text.insert(
+                "end", "\n\n   Файл с расширением iec_hmi не выбран"
+            )
+            self.controller.frames["IBManagerFrame"].error_text.see("end")
+r"""
+        self.ib_file_frame.grid_columnconfigure(1, weight=1)
+
+        self.table_frame = ctk.CTkFrame(self)
+        self.table_frame.pack(pady=(20, 5), padx=50, fill="both", expand=True)
+
+        # Create a canvas to hold the table
+        self.canvas = tk.Canvas(self.table_frame)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Add a vertical scrollbar to the canvas
+        self.scrollbar = ctk.CTkScrollbar(
+            self.table_frame, orientation=tk.VERTICAL, command=self.canvas.yview
+        )
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Configure the canvas to work with the scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
+
+        # Handle mouse wheel scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        # Create another frame inside the canvas to hold the actual table
+        self.table_inner_frame = ctk.CTkFrame(self.canvas)
+        self.canvas.create_window((0, 0), window=self.table_inner_frame, anchor="nw")
+
+        # Initialize table
+        self.create_table()
+
+        # Update button
+        self.update_button = ctk.CTkButton(
+            self,
+            text="Обновить таблицу",
+            command=self.update_table,
+            width=200,
+            height=50,
+        )
+        self.update_button.pack(pady=10)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+
+    def parse_iec_hmi_file(self):
+        names = []
+        try:
+            if self.controller.selected_files["iec_hmi"]:
+                file_path = self.controller.selected_files["iec_hmi"]
+                with open(file_path, "r", encoding="utf-8") as file:
+                    content = file.read()
+
+                    # Найти строки с шаблоном Name="*****" ShowVarTypes=
+                    pattern = r'Name="([^"]+)"\s+ShowVarTypes='
+                    fb_entries = re.findall(pattern, content)
+                    #print(f"Found window names: {fb_entries}")  # Debugging print statement
+
+                    names.extend(fb_entries)
+
+            else:
+                print("No iec_hmi file selected")  # Debugging print statement
+
+        except Exception as e:
+            print(f"Error parsing the file: {e}")
+
+        return names
+
+    def parse_types_in_window(self, window_name):
+        types = set()  # Use set to store unique values
+        try:
+            if self.controller.selected_files["iec_hmi"]:
+                file_path = self.controller.selected_files["iec_hmi"]
+                with open(file_path, "r", encoding="utf-8") as file:
+                    content = file.read()
+    
+                    # Find the window with the specified name
+                    window_pattern = rf'Name="{window_name}"\s+ShowVarTypes='
+                    window_match = re.search(window_pattern, content)
+                    if window_match:
+                        start_pos = window_match.end()
+                        # Find the end of the window's content, look for the next 'Name="' or end of content
+                        next_window_match = re.search(r'Name="[^"]+"\s+ShowVarTypes=', content[start_pos:])
+                        end_pos = start_pos + next_window_match.start() if next_window_match else len(content)
+                        window_content = content[start_pos:end_pos]
+    
+                        # Find lines with pattern Type="*****" TypeUUID=
+                        pattern_types = r'<FB[^>]*Type="([^"]*)"[^>]*>(?:(?!<FB)[\s\S])*?<VarValue Variable="(pos|size|zValue)".*?</FB>'
+                    
+                    
+                        type_entries = re.findall(pattern_types, window_content, re.DOTALL)
+    
+                        # Extract only the unique Type entries
+                        for type_entry in type_entries:
+                            types.add(type_entry[0])
+    
+                    else:
+                        print(f"No window named {window_name} found")  # Debugging print statement
+    
+            else:
+                print("No iec_hmi file selected")  # Debugging print statement
+    
+        except Exception as e:
+            print(f"Error parsing the file: {e}")
+    
+        return list(types)  # Convert set back to list
+
+
+
+    def create_table(self):
+        names = self.parse_iec_hmi_file()
+        #print(f"Creating table with initial names: {names}")  # Debugging print statement
+
+        # Clear the existing content in the table_inner_frame
+        for widget in self.table_inner_frame.winfo_children():
+            widget.destroy()
+
+        # Table headers
+        self.name_optionmenu = ScrollableOptionMenu(
+            self.table_inner_frame, values=names, command=self.optionmenu_callback
+        )
+        self.name_optionmenu.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+
+        header_control = ctk.CTkLabel(self.table_inner_frame, text="R_Control")
+        header_control.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+
+        # Empty row initially
+        self.empty_row_label = ctk.CTkLabel(self.table_inner_frame, text="")
+        self.empty_row_label.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+
+        self.empty_row_checkbox = ctk.CTkCheckBox(self.table_inner_frame, text="")
+        self.empty_row_checkbox.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+
+        # Configure column weights
+        self.table_inner_frame.grid_columnconfigure(0, weight=1)
+        self.table_inner_frame.grid_columnconfigure(1, weight=1)
+
+        # Update the scrollregion after adding new widgets
+        self.table_inner_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def update_table(self):
+        self.create_table()
+
+    def optionmenu_callback(self, choice):
+        print(f"Option menu dropdown clicked: {choice}")  # Debugging print statement
+        types = self.parse_types_in_window(choice)
+        self.update_table_with_types(types)
+
+    def update_table_with_types(self, types):
+        print(f"Updating table with types: {types}")  # Debugging print statement
+    
+        # Clear the existing content in the table_inner_frame
+        for widget in self.table_inner_frame.winfo_children():
+            widget.destroy()
+    
+        # Table headers
+        header_name = ctk.CTkLabel(self.table_inner_frame, text="Name")
+        header_name.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+    
+        header_control = ctk.CTkLabel(self.table_inner_frame, text="R_Control")
+        header_control.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+    
+        if not types:
+            # No types found, add a message
+            no_types_label = ctk.CTkLabel(self.table_inner_frame, text="No types found in selected window.")
+            no_types_label.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+        else:
+            # Table rows with types
+            for i, type_name in enumerate(types):
+                display_text = f"{type_name}"
+                name_label = ctk.CTkLabel(self.table_inner_frame, text=display_text)
+                name_label.grid(row=i + 1, column=0, padx=5, pady=5, sticky="nsew")
+    
+                control_checkbox = ctk.CTkCheckBox(self.table_inner_frame, text="")
+                control_checkbox.grid(row=i + 1, column=1, padx=5, pady=5, sticky="nsew")
+    
+        # Configure column weights
+        self.table_inner_frame.grid_columnconfigure(0, weight=1)
+        self.table_inner_frame.grid_columnconfigure(1, weight=1)
+    
+        # Update the scrollregion after adding new widgets
+        self.table_inner_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+"""
 def show_error_dialog():
     root = tk.Tk()
     root.withdraw()  # Скрыть основное окно приложения
     messagebox.showerror("Ошибка", "Доступ запрещен. Обратитесь к администратору.")
 
+import ctypes
+def set_app_icon(icon_path):
+    app_id = '123'  # Уникальный идентификатор вашего приложения
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+
 
 def execute_on_successful_access():
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
+    
     app = App()
+    app.iconbitmap("D:/_Yatsyshin/SONATA/Ib_manager/_IB_Manager-release/IB_Manager-release_Test/rocket.ico")  # Установка иконки
+    set_app_icon("D:/_Yatsyshin/SONATA/Ib_manager/_IB_Manager-release/IB_Manager-release_Test/rocket.ico")
     app.mainloop()
 
 

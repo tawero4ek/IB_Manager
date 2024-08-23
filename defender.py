@@ -19,7 +19,7 @@ hash_filename = os.getenv("HASH_FILE_NAME")
 # Имена разрешенных компов
 ALLOWED_COMPUTER_NAMES = ["SPB-CHEPUSOV1",
                           "SPB-DENISENKO",
-                          "SPB-MYLOV",
+                          "SPB-SPB3",
                           "SPB-SHEGLOV",
                           "SPB-VERSHININ",
                           "SPB-ERSHOV",

@@ -48,7 +48,7 @@ def find_window_usage(file_path, graphics_label_file=None, subwindow_label_file=
             lines = file.readlines()
             for line in lines:
                 if 'Name="' in line:
-                    match = re.search(r'Name="([^"]*)" ShowVarTypes=', line)
+                    match = re.search(r'Name="([^"]*)"( Comment="[^"]*")? ShowVarTypes="([^"]*)"', line)
                     if match:
                         fb_type_name = match.group(1)
                 for name in all_names:
@@ -58,14 +58,11 @@ def find_window_usage(file_path, graphics_label_file=None, subwindow_label_file=
                             source_name = source_match.group(1).split('.')[0]
                             if fb_type_name:
                                 matches.append(f"Блок = \"{source_name}\" Используется в окне = \"{fb_type_name}\"")
-
         return matches
     except IOError as e:
         print(f"Error opening file: {e}")
         return None
     
-
-import re
 
 def find_unused_windows(file_path):
     try:
@@ -83,4 +80,26 @@ def find_unused_windows(file_path):
         print(f"Error opening file: {e}")
         return None
 
-    
+
+def find_user_blocks(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+            matches = []
+            fb_type_name = None
+
+            for line in lines:
+                # Ищем строку с именем блока
+                name_match = re.search(r'Name="([^"]*)"( Comment="[^"]*")? ShowVarTypes="([^"]*)"', line)
+                if name_match:
+                    fb_type_name = name_match.group(1)
+
+                # Ищем строку с Type="USER" TypeUUID=
+                if 'Type="USER" TypeUUID=' in line  or 'Type="CHECK_RIGHTS" TypeUUID=' in line:
+                    if fb_type_name:
+                        matches.append(f"Используется в окне = \"{fb_type_name}\"")
+
+            return matches
+    except IOError as e:
+        print(f"Error opening file: {e}")
+        return None
